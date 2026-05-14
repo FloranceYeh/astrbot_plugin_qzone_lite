@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+import asyncio
 import ipaddress
 from typing import Union
 from urllib.parse import urlparse
@@ -10,7 +11,7 @@ from astrbot.api import logger
 BytesOrStr = Union[str, bytes]
 
 
-def _is_safe_image_url(url: str) -> bool:
+async def _is_safe_image_url(url: str) -> bool:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         return False
@@ -21,6 +22,20 @@ def _is_safe_image_url(url: str) -> bool:
 
     try:
         ip = ipaddress.ip_address(host)
+        ips = {ip}
+    except ValueError:
+        try:
+            loop = asyncio.get_running_loop()
+            infos = await loop.getaddrinfo(host, None, type=0)
+            ips = {
+                ipaddress.ip_address(info[4][0])
+                for info in infos
+                if info and len(info) > 4 and info[4]
+            }
+        except Exception:
+            return False
+
+    for ip in ips:
         if (
             ip.is_private
             or ip.is_loopback
@@ -30,14 +45,14 @@ def _is_safe_image_url(url: str) -> bool:
             or ip.is_unspecified
         ):
             return False
-    except ValueError:
-        pass
     return True
 
 
 async def download_file(url: str) -> bytes | None:
-    if not _is_safe_image_url(url):
-        logger.warning(f"拒绝下载不安全图片 URL: {url}")
+    if not await _is_safe_image_url(url):
+        parsed = urlparse(url)
+        safe_target = f"{parsed.scheme}://{parsed.hostname or ''}"
+        logger.warning(f"拒绝下载不安全图片 URL: {safe_target}")
         return None
     try:
         timeout = aiohttp.ClientTimeout(total=15)
