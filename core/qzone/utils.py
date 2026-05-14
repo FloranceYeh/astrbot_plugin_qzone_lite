@@ -12,53 +12,65 @@ from astrbot.api import logger
 BytesOrStr = Union[str, bytes]
 
 
-async def _is_safe_image_url(url: str) -> bool:
+def _is_blocked_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
+
+async def _check_image_url_safety(url: str) -> tuple[bool, str]:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
-        return False
+        return False, "invalid_scheme"
 
     host = (parsed.hostname or "").strip().lower()
     if not host or host == "localhost":
-        return False
+        return False, "invalid_host"
 
     try:
-        ip = ipaddress.ip_address(host)
-        ips = {ip}
+        ip_literal = ipaddress.ip_address(host)
+        if _is_blocked_ip(ip_literal):
+            return False, "blocked_ip_literal"
+        return True, "ok"
     except ValueError:
-        try:
-            loop = asyncio.get_running_loop()
-            infos = await loop.getaddrinfo(
-                host,
-                None,
-                family=socket.AF_UNSPEC,
-                type=socket.SOCK_STREAM,
-            )
-            ips = {
-                ipaddress.ip_address(info[4][0])
-                for info in infos
-                if info and len(info) > 4 and info[4]
-            }
-        except Exception:
-            return False
+        pass
+
+    try:
+        loop = asyncio.get_running_loop()
+        infos = await loop.getaddrinfo(
+            host,
+            None,
+            family=socket.AF_UNSPEC,
+            type=socket.SOCK_STREAM,
+        )
+        ips = {
+            ipaddress.ip_address(info[4][0])
+            for info in infos
+            if info and len(info) > 4 and info[4]
+        }
+    except Exception as e:
+        logger.warning(f"图片 URL DNS 解析失败: {type(e).__name__}")
+        return False, "dns_resolution_failed"
 
     for ip in ips:
-        if (
-            ip.is_private
-            or ip.is_loopback
-            or ip.is_link_local
-            or ip.is_multicast
-            or ip.is_reserved
-            or ip.is_unspecified
-        ):
-            return False
-    return True
+        if _is_blocked_ip(ip):
+            return False, "blocked_resolved_ip"
+    return True, "ok"
 
 
 async def download_file(url: str) -> bytes | None:
     parsed = urlparse(url)
     host = parsed.hostname or ""
-    if not await _is_safe_image_url(url):
-        logger.warning(f"拒绝下载不安全图片 URL host: {host}")
+    ok, reason = await _check_image_url_safety(url)
+    if not ok:
+        logger.warning(
+            f"拒绝下载不安全图片 URL host: {host}, scheme: {parsed.scheme}, reason: {reason}"
+        )
         return None
     try:
         timeout = aiohttp.ClientTimeout(total=15)
