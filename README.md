@@ -39,3 +39,5 @@ QQ 空间轻量插件，基于上游项目裁剪而来。
 说明：
 - 若 `send_feedback=true`，LLM Tool 执行时也会在会话中发送对应反馈消息。
 - 以上工具的行为与同名命令保持一致，均依赖 QQ 空间登录态（Cookies / CQHTTP 会话）。
+
+配置位置：插件配置项 `send_feedback`（默认值 `true`，可在 AstrBot 插件配置面板中修改）。
