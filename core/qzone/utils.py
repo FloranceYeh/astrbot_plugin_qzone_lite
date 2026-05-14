@@ -54,7 +54,7 @@ async def _check_image_url_safety(url: str) -> tuple[bool, str]:
             if info and len(info) > 4 and info[4]
         }
     except Exception as e:
-        logger.warning(f"图片 URL DNS 解析失败: {type(e).__name__}")
+        logger.warning(f"图片 URL DNS 解析失败 host={host}: {type(e).__name__}")
         return False, "dns_resolution_failed"
 
     for ip in ips:
@@ -79,7 +79,7 @@ async def download_file(url: str) -> bytes | None:
                 response.raise_for_status()
                 return await response.read()
     except Exception as e:
-        logger.error(f"图片下载失败: {type(e).__name__}")
+        logger.error(f"图片下载失败 host={host}: {type(e).__name__}")
 
 
 async def normalize_images(images: Sequence[BytesOrStr] | None) -> list[bytes]:
