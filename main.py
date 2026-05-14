@@ -69,6 +69,7 @@ class QzoneLitePlugin(Star):
 
     @filter.command("看说说", alias={"查看说说"})
     async def view_feed(self, event: AiocqhttpMessageEvent):
+        """命令提示：看说说 [@用户] [序号/范围]"""
         posts = await self._get_posts(event, with_detail=True)
         for post in posts:
             await self.sender.send_post(event, post)
@@ -76,6 +77,7 @@ class QzoneLitePlugin(Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("发说说")
     async def publish_feed(self, event: AiocqhttpMessageEvent):
+        """命令提示：发说说 <文本> [图片]（管理员）"""
         text = event.message_str.partition(" ")[2]
         images = await get_image_urls(event)
         try:
@@ -89,6 +91,7 @@ class QzoneLitePlugin(Star):
 
     @filter.command("评说说", alias={"评论说说", "读说说"})
     async def comment_feed(self, event: AiocqhttpMessageEvent):
+        """命令提示：评说说 [@用户] [序号/范围] <评论内容>"""
         target_id, pos, num, content = parse_comment_args(event)
         if not content:
             yield event.plain_result("请在命令末尾提供评论内容，例如：评说说 0 路过~")
@@ -117,6 +120,7 @@ class QzoneLitePlugin(Star):
 
     @filter.command("回评", alias={"回复评论"})
     async def reply_comment(self, event: AiocqhttpMessageEvent):
+        """命令提示：回评 [@用户] [说说序号] [评论序号] <回复内容>"""
         target_id, pos, comment_index, content = parse_reply_args(event)
         if not content:
             yield event.plain_result("请提供回复内容，例如：回评 0 -1 谢谢你的评论")
