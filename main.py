@@ -70,7 +70,8 @@ class QzoneLitePlugin(Star):
         images = await get_image_urls(event)
         try:
             post = await self.service.publish_post(text=text, images=images)
-            await self.sender.send_post(event, post, message="已发布")
+            if self.cfg.send_feedback:
+                await self.sender.send_post(event, post, message="已发布")
             event.stop_event()
         except Exception as e:
             yield event.plain_result(str(e))
@@ -98,7 +99,8 @@ class QzoneLitePlugin(Star):
         for post in posts:
             try:
                 await self.service.comment_posts(post, content)
-                await self.sender.send_post(event, post, message="已评论")
+                if self.cfg.send_feedback:
+                    await self.sender.send_post(event, post, message="已评论")
             except Exception as e:
                 await event.send(event.plain_result(str(e)))
                 logger.error(e)
@@ -124,7 +126,87 @@ class QzoneLitePlugin(Star):
                 return
             post = posts[0]
             await self.service.reply_comment(post, comment_index, content)
-            await self.sender.send_post(event, post, message="已回复评论")
+            if self.cfg.send_feedback:
+                await self.sender.send_post(event, post, message="已回复评论")
         except Exception as e:
             await event.send(event.plain_result(str(e)))
             logger.error(e)
+
+    @filter.llm_tool()
+    async def llm_view_feed(self, query: str, target_id: str | None
+    ):
+        try:
+            posts = await self.service.query_feeds(
+                target_id=target_id,
+                pos=0,
+                num=5,
+                with_detail=True,
+            )
+            return "\n\n".join(post.to_str() for post in posts)
+        except Exception as e:
+            logger.error(e)
+            return f"查询说说失败: {str(e)}"
+
+    @filter.llm_tool()
+    async def llm_publish_feed(self, query: str, target_id: str | None = None):
+        images = get_image_urls(query)
+        text = query
+        for img in images:
+            text = text.replace(img, "").strip()
+
+        try:
+            post = await self.service.publish_post(text=text, images=images)
+            if self.cfg.send_feedback:
+                return f"已发布说说，ID: {post.id}"
+            return "说说发布成功"
+        except Exception as e:
+            logger.error(e)
+            return f"发布说说失败: {str(e)}"
+
+    @filter.llm_tool()
+    async def llm_comment_feed(self, query: str, target_id: str | None
+    ):
+        content = query
+        pos = 0
+        num = 1
+        try:
+            posts = await self.service.query_feeds(
+                target_id=target_id,
+                pos=pos,
+                num=num,
+                with_detail=False,
+            )
+            if not posts:
+                return "查询结果为空"
+            post = posts[0]
+            await self.service.comment_posts(post, content)
+            if self.cfg.send_feedback:
+                return f"已评论说说，ID: {post.id}"
+            return "说说评论成功"
+        except Exception as e:
+            logger.error(e)
+            return f"评论说说失败: {str(e)}"
+
+    @filter.llm_tool()
+    async def llm_reply_comment(self, query: str, target_id: str | None
+    ):
+        content = query
+        pos = 0
+        comment_index = -1
+        try:
+            posts = await self.service.query_feeds(
+                target_id=target_id,
+                pos=pos,
+                num=1,
+                with_detail=True,
+            )
+            if not posts:
+                return "查询结果为空"
+            post = posts[0]
+            await self.service.reply_comment(post, comment_index, content)
+            if self.cfg.send_feedback:
+                return f"已回复评论，ID: {post.id}"
+            return "评论回复成功"
+        except Exception as e:
+            logger.error(e)
+            return f"回复评论失败: {str(e)}"

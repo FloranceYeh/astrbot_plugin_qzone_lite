@@ -5,6 +5,12 @@
     "hint": "选填，用于维持 QQ 空间登录态；留空则自动从 aiocqhttp 客户端获取",
     "default": ""
   },
+  "send_feedback": {
+    "description": "发送反馈",
+    "type": "bool",
+    "hint": "是否在执行操作时返回反馈信息",
+    "default": true
+  },
   "timeout": {
     "description": "请求超时时间",
     "type": "int",

@@ -1,7 +1,7 @@
 name: astrbot_plugin_qzone_lite
 display_name: QQ空间Lite
-desc: QQ空间轻量插件，仅支持查看/发表/评论说说与回复评论（无DB/无LLM）
+desc: QQ空间轻量插件，仅支持查看/发表/评论说说与回复评论
 help: 略
 version: v1.0.0
-author: Zhalslar
-repo: https://github.com/Zhalslar/astrbot_plugin_qzone
+author: Florance
+repo: https://github.com/FloranceYeh/astrbot_plugin_qzone_lite
