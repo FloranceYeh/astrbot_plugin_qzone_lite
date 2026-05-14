@@ -1,0 +1,29 @@
+{
+  "cookies_str": {
+    "description": "QQ Cookies",
+    "type": "text",
+    "hint": "选填，用于维持 QQ 空间登录态；留空则自动从 aiocqhttp 客户端获取",
+    "default": ""
+  },
+  "timeout": {
+    "description": "请求超时时间",
+    "type": "int",
+    "hint": "网络请求超时时间（秒）",
+    "slider": { "min": 5, "max": 60, "step": 1 },
+    "default": 10
+  },
+  "request_interval": {
+    "description": "QQ空间请求最小间隔（秒）",
+    "type": "float",
+    "hint": "每次请求前至少等待该时长，降低限流概率",
+    "slider": { "min": 0, "max": 5, "step": 0.1 },
+    "default": 0.8
+  },
+  "request_jitter": {
+    "description": "QQ空间请求随机抖动（秒）",
+    "type": "float",
+    "hint": "在最小间隔基础上增加 0~该值的随机延时",
+    "slider": { "min": 0, "max": 3, "step": 0.1 },
+    "default": 0.6
+  }
+}
