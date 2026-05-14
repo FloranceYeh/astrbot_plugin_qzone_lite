@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 import asyncio
 import ipaddress
+import socket
 from typing import Union
 from urllib.parse import urlparse
 
@@ -26,7 +27,12 @@ async def _is_safe_image_url(url: str) -> bool:
     except ValueError:
         try:
             loop = asyncio.get_running_loop()
-            infos = await loop.getaddrinfo(host, None, type=0)
+            infos = await loop.getaddrinfo(
+                host,
+                None,
+                family=socket.AF_UNSPEC,
+                type=socket.SOCK_STREAM,
+            )
             ips = {
                 ipaddress.ip_address(info[4][0])
                 for info in infos
@@ -49,10 +55,10 @@ async def _is_safe_image_url(url: str) -> bool:
 
 
 async def download_file(url: str) -> bytes | None:
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
     if not await _is_safe_image_url(url):
-        parsed = urlparse(url)
-        safe_target = f"{parsed.scheme}://{parsed.hostname or ''}"
-        logger.warning(f"拒绝下载不安全图片 URL: {safe_target}")
+        logger.warning(f"拒绝下载不安全图片 URL host: {host}")
         return None
     try:
         timeout = aiohttp.ClientTimeout(total=15)
@@ -61,7 +67,7 @@ async def download_file(url: str) -> bytes | None:
                 response.raise_for_status()
                 return await response.read()
     except Exception as e:
-        logger.error(f"图片下载失败: {e}")
+        logger.error(f"图片下载失败: {type(e).__name__}")
 
 
 async def normalize_images(images: Sequence[BytesOrStr] | None) -> list[bytes]:
