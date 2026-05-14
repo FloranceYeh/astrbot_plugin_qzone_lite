@@ -10,7 +10,13 @@ from .core.config import PluginConfigLite
 from .core.qzone import QzoneAPI, QzoneSession
 from .core.sender import SenderLite
 from .core.service import LitePostService
-from .core.utils import get_ats, get_image_urls, parse_comment_args, parse_range, parse_reply_args
+from .core.utils import (
+    get_ats,
+    get_image_urls,
+    parse_comment_args,
+    parse_range,
+    parse_reply_args,
+)
 
 
 class QzoneLitePlugin(Star):
@@ -56,6 +62,10 @@ class QzoneLitePlugin(Star):
             logger.error(e)
             event.stop_event()
             return []
+
+    # =========================
+    # Commands
+    # =========================
 
     @filter.command("看说说", alias={"查看说说"})
     async def view_feed(self, event: AiocqhttpMessageEvent):
@@ -109,9 +119,7 @@ class QzoneLitePlugin(Star):
     async def reply_comment(self, event: AiocqhttpMessageEvent):
         target_id, pos, comment_index, content = parse_reply_args(event)
         if not content:
-            yield event.plain_result(
-                "请提供回复内容，例如：回评 0 -1 谢谢你的评论"
-            )
+            yield event.plain_result("请提供回复内容，例如：回评 0 -1 谢谢你的评论")
             return
 
         try:
@@ -132,70 +140,31 @@ class QzoneLitePlugin(Star):
             await event.send(event.plain_result(str(e)))
             logger.error(e)
 
+    # =========================
+    # LLM Tools
+    # =========================
+
+    @staticmethod
+    def _format_post_for_llm(post) -> str:
+        return post.to_str()
+
     @filter.llm_tool()
-    async def llm_view_feed(self, query: str, target_id: str | None
-    ):
+    async def llm_view_feed(
+        self,
+        event: AiocqhttpMessageEvent,
+        user_id: str | None = None,
+        pos: int = 0,
+    ) -> str:
+        """查看某位用户的说说（轻量版）。
+
+        Args:
+            user_id(string): 目标 QQ 号，默认当前会话发送者
+            pos(number): 说说序号（0 表示最新）
+        """
         try:
+            target = user_id or event.get_sender_id()
             posts = await self.service.query_feeds(
-                target_id=target_id,
-                pos=0,
-                num=5,
-                with_detail=True,
-            )
-            return "\n\n".join(post.to_str() for post in posts)
-        except Exception as e:
-            logger.error(e)
-            return f"查询说说失败: {str(e)}"
-
-    @filter.llm_tool()
-    async def llm_publish_feed(self, query: str, target_id: str | None = None):
-        images = get_image_urls(query)
-        text = query
-        for img in images:
-            text = text.replace(img, "").strip()
-
-        try:
-            post = await self.service.publish_post(text=text, images=images)
-            if self.cfg.send_feedback:
-                return f"已发布说说，ID: {post.id}"
-            return "说说发布成功"
-        except Exception as e:
-            logger.error(e)
-            return f"发布说说失败: {str(e)}"
-
-    @filter.llm_tool()
-    async def llm_comment_feed(self, query: str, target_id: str | None
-    ):
-        content = query
-        pos = 0
-        num = 1
-        try:
-            posts = await self.service.query_feeds(
-                target_id=target_id,
-                pos=pos,
-                num=num,
-                with_detail=False,
-            )
-            if not posts:
-                return "查询结果为空"
-            post = posts[0]
-            await self.service.comment_posts(post, content)
-            if self.cfg.send_feedback:
-                return f"已评论说说，ID: {post.id}"
-            return "说说评论成功"
-        except Exception as e:
-            logger.error(e)
-            return f"评论说说失败: {str(e)}"
-
-    @filter.llm_tool()
-    async def llm_reply_comment(self, query: str, target_id: str | None
-    ):
-        content = query
-        pos = 0
-        comment_index = -1
-        try:
-            posts = await self.service.query_feeds(
-                target_id=target_id,
+                target_id=target,
                 pos=pos,
                 num=1,
                 with_detail=True,
@@ -203,10 +172,108 @@ class QzoneLitePlugin(Star):
             if not posts:
                 return "查询结果为空"
             post = posts[0]
-            await self.service.reply_comment(post, comment_index, content)
             if self.cfg.send_feedback:
-                return f"已回复评论，ID: {post.id}"
-            return "评论回复成功"
+                await self.sender.send_post(event, post)
+            return self._format_post_for_llm(post)
         except Exception as e:
             logger.error(e)
-            return f"回复评论失败: {str(e)}"
+            return str(e)
+
+    @filter.llm_tool()
+    async def llm_publish_feed(
+        self,
+        event: AiocqhttpMessageEvent,
+        text: str = "",
+        get_image: bool = True,
+    ) -> str:
+        """发布一条说说（轻量版）。
+
+        Args:
+            text(string): 说说正文
+            get_image(boolean): 是否附带当前对话图片
+        """
+        try:
+            images = await get_image_urls(event) if get_image else []
+            post = await self.service.publish_post(text=text, images=images)
+            if self.cfg.send_feedback:
+                await self.sender.send_post(event, post, message="已发布")
+            return "已发布说说\n" + self._format_post_for_llm(post)
+        except Exception as e:
+            logger.error(e)
+            return str(e)
+
+    @filter.llm_tool()
+    async def llm_comment_feed(
+        self,
+        event: AiocqhttpMessageEvent,
+        user_id: str | None = None,
+        pos: int = 0,
+        content: str = "",
+    ) -> str:
+        """评论一条说说（轻量版：必须提供 content）。
+
+        Args:
+            user_id(string): 目标 QQ 号，默认当前会话发送者
+            pos(number): 说说序号（0 表示最新）
+            content(string): 评论内容（必填）
+        """
+        try:
+            if not content or not content.strip():
+                return "评论失败：content 不能为空"
+
+            target = user_id or event.get_sender_id()
+            posts = await self.service.query_feeds(
+                target_id=target,
+                pos=pos,
+                num=1,
+                with_detail=False,
+            )
+            if not posts:
+                return "查询结果为空"
+            post = posts[0]
+            await self.service.comment_posts(post, content)
+            if self.cfg.send_feedback:
+                await self.sender.send_post(event, post, message="已评论")
+            return "已评论\n" + self._format_post_for_llm(post)
+        except Exception as e:
+            logger.error(e)
+            return str(e)
+
+    @filter.llm_tool()
+    async def llm_reply_comment(
+        self,
+        event: AiocqhttpMessageEvent,
+        user_id: str | None = None,
+        pos: int = 0,
+        reply_index: int = -1,
+        content: str = "",
+    ) -> str:
+        """回复某条说说下的评论（轻量版：必须提供 content）。
+
+        Args:
+            user_id(string): 目标 QQ 号，默认当前会话发送者
+            pos(number): 说说序号（0 表示最新）
+            reply_index(number): 要回复的评论序号（基于排除自己评论后的列表）
+            content(string): 回复内容（必填）
+        """
+        try:
+            if not content or not content.strip():
+                return "回复失败：content 不能为空"
+
+            target = user_id or event.get_sender_id()
+            posts = await self.service.query_feeds(
+                target_id=target,
+                pos=pos,
+                num=1,
+                with_detail=True,
+            )
+            if not posts:
+                return "查询结果为空"
+            post = posts[0]
+            await self.service.reply_comment(post, reply_index, content)
+            if self.cfg.send_feedback:
+                await self.sender.send_post(event, post, message="已回复评论")
+            return "已回复评论\n" + self._format_post_for_llm(post)
+        except Exception as e:
+            logger.error(e)
+            return str(e)

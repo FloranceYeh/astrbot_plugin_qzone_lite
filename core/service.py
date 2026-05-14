@@ -208,20 +208,21 @@ class LitePostService:
     async def reply_comment(self, post: Post, index: int, content: str):
         if not post.tid:
             raise ValueError("帖子 tid 为空")
-        uin = await self.session.get_uin()
-        other_comments = [c for c in post.comments if c.uin != uin]
-        n = len(other_comments)
+        n = len(post.comments)
         if n == 0:
             raise ValueError("没有可回复的评论")
         if not (-n <= index < n):
-            raise ValueError(f"索引越界, 当前仅有 {n} 条可回复评论")
-        comment = other_comments[index]
+            raise ValueError(f"索引越界, 当前共有 {n} 条评论")
+        comment = post.comments[index]
+        if not getattr(comment, "tid", 0):
+            raise ValueError("该评论缺少 tid，可能是本地临时记录，无法回复；请重新获取详情后再试")
         content = (content or "").strip()
         if not content:
             raise ValueError("回复内容为空")
         resp = await self.qzone.reply(post, comment, content)
         if not resp.ok:
             raise RuntimeError(resp.message)
+        uin = await self.session.get_uin()
         name = await self.session.get_nickname()
         post.comments.append(
             Comment(

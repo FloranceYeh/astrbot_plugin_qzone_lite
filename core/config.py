@@ -74,6 +74,7 @@ class ConfigNode:
 
 class PluginConfigLite(ConfigNode):
     cookies_str: str
+    send_feedback: bool = True
     timeout: int
     request_interval: float
     request_jitter: float
@@ -82,6 +83,10 @@ class PluginConfigLite(ConfigNode):
         super().__init__(cfg)
         self.context = context
         self.client: CQHttp | None = None
+
+        # 与 _conf_schema.json 对齐：缺失时写入默认值
+        if self.send_feedback is None:
+            self.send_feedback = True
         self.save_config()
 
     def update_cookies(self, cookies_str: str):
