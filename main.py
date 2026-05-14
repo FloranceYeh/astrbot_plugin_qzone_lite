@@ -253,7 +253,7 @@ class QzoneLitePlugin(Star):
         Args:
             user_id(string): 目标 QQ 号，默认当前会话发送者
             pos(number): 说说序号（0 表示最新）
-            reply_index(number): 要回复的评论序号（基于排除自己评论后的列表）
+            reply_index(number): 要回复的评论序号（基于说说详情的全部评论列表）
             content(string): 回复内容（必填）
         """
         try:

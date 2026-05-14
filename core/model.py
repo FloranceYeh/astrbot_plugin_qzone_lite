@@ -96,6 +96,9 @@ class Post(pydantic.BaseModel):
     class Config:
         json_encoders = {Comment: lambda c: c.model_dump()}
 
+    def replyable_comments(self) -> list[Comment]:
+        return self.comments
+
     def to_str(self) -> str:
         dt = datetime.fromtimestamp(int(self.create_time) if str(self.create_time).isdigit() else int(datetime.now().timestamp()))
         lines = [f"### {self.name}({self.uin}) 发布于 {dt.strftime('%Y-%m-%d %H:%M')}"]
@@ -109,8 +112,9 @@ class Post(pydantic.BaseModel):
         if self.videos:
             lines.append("\n视频：")
             lines.extend(self.videos)
-        if self.comments:
+        comments = self.replyable_comments()
+        if comments:
             lines.append("\n评论：")
-            for idx, c in enumerate(self.comments):
+            for idx, c in enumerate(comments):
                 lines.append(f"{idx}. {remove_em_tags(c.nickname)}：{remove_em_tags(extract_and_replace_nickname(c.content))}")
         return "\n".join(lines)

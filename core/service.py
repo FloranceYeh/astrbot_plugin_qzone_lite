@@ -208,12 +208,13 @@ class LitePostService:
     async def reply_comment(self, post: Post, index: int, content: str):
         if not post.tid:
             raise ValueError("帖子 tid 为空")
-        n = len(post.comments)
+        comments = post.replyable_comments()
+        n = len(comments)
         if n == 0:
             raise ValueError("没有可回复的评论")
         if not (-n <= index < n):
             raise ValueError(f"索引越界, 当前共有 {n} 条评论")
-        comment = post.comments[index]
+        comment = comments[index]
         if not getattr(comment, "tid", 0):
             raise ValueError("该评论缺少 tid，可能是本地临时记录，无法回复；请重新获取详情后再试")
         content = (content or "").strip()
