@@ -81,6 +81,8 @@ class PluginConfigLite(ConfigNode):
         "请分析这条 QQ 空间说说中的图片内容，用简洁中文概括图片里可见的主体、"
         "场景、文字和可能表达的情绪。不要编造看不见的信息。"
     )
+    feed_cache_max_size: int = 50
+    feed_cache_ttl_seconds: int = 1800
     timeout: int
     request_interval: float
     request_jitter: float
@@ -99,6 +101,10 @@ class PluginConfigLite(ConfigNode):
             self.vision_provider_id = ""
         if self.vision_prompt is None:
             self.vision_prompt = self.__class__.vision_prompt
+        if self.feed_cache_max_size is None:
+            self.feed_cache_max_size = 50
+        if self.feed_cache_ttl_seconds is None:
+            self.feed_cache_ttl_seconds = 1800
         self.save_config()
 
     def update_cookies(self, cookies_str: str):

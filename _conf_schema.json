@@ -30,6 +30,20 @@
     "hint": "用于指导视觉模型如何分析说说图片",
     "default": "请分析这条 QQ 空间说说中的图片内容，用简洁中文概括图片里可见的主体、场景、文字和可能表达的情绪。不要编造看不见的信息。"
   },
+  "feed_cache_max_size": {
+    "description": "说说缓存数量",
+    "type": "int",
+    "hint": "最多缓存多少条已查询到的说说内容；设为 0 可关闭缓存",
+    "slider": { "min": 0, "max": 500, "step": 1 },
+    "default": 50
+  },
+  "feed_cache_ttl_seconds": {
+    "description": "说说缓存时间（秒）",
+    "type": "int",
+    "hint": "缓存有效期。有效期内再次查询相同位置的说说时复用正文、图片和图片分析，只刷新评论内容；设为 0 可关闭缓存",
+    "slider": { "min": 0, "max": 86400, "step": 60 },
+    "default": 1800
+  },
   "timeout": {
     "description": "请求超时时间",
     "type": "int",

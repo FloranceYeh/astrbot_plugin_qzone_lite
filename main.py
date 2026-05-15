@@ -67,6 +67,8 @@ class QzoneLitePlugin(Star):
     async def _analyze_post_images(self, post) -> None:
         if not self.cfg.analyze_images_on_view_feed or not post.images:
             return
+        if post.extra_text:
+            return
 
         provider = (
             self.context.get_provider_by_id(self.cfg.vision_provider_id)

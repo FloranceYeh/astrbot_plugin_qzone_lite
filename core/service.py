@@ -1,4 +1,6 @@
 import time
+from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Any
 
 from astrbot.api import logger
@@ -21,10 +23,25 @@ from .qzone.constants import (
 )
 
 
+@dataclass
+class _PostCacheEntry:
+    post: Post
+    ts: float
+
+
+@dataclass
+class _QueryCacheEntry:
+    post_keys: list[tuple[int, str]]
+    ts: float
+
+
 class LitePostService:
     def __init__(self, qzone: QzoneAPI, session: QzoneSession):
         self.qzone = qzone
         self.session = session
+        self.cfg = qzone.cfg
+        self._post_cache: OrderedDict[tuple[int, str], _PostCacheEntry] = OrderedDict()
+        self._query_cache: OrderedDict[tuple[str, int, int], _QueryCacheEntry] = OrderedDict()
 
     async def query_feeds(
         self,
@@ -36,21 +53,26 @@ class LitePostService:
         no_self: bool = False,
         no_commented: bool = False,
     ) -> list[Post]:
-        if target_id:
-            resp = await self.qzone.get_feeds(target_id, pos=pos, num=num)
-            if not resp.ok:
-                raise RuntimeError(self._map_feed_error(resp, target_id=target_id))
-            msglist = resp.data.get("msglist") or []
-            if not msglist:
-                raise RuntimeError(f"QQ {target_id} 暂无可见说说")
-            posts: list[Post] = QzoneParser.parse_feeds(msglist)
-        else:
-            resp = await self.qzone.get_recent_feeds()
-            if not resp.ok:
-                raise RuntimeError(self._map_feed_error(resp))
-            posts = QzoneParser.parse_recent_feeds(resp.data)[pos : pos + num]
-            if not posts:
-                raise RuntimeError("动态流暂无可见说说")
+        cache_key = self._query_cache_key(target_id, pos, num)
+        posts = self._get_cached_query_posts(cache_key) if with_detail else []
+        if not posts:
+            if target_id:
+                resp = await self.qzone.get_feeds(target_id, pos=pos, num=num)
+                if not resp.ok:
+                    raise RuntimeError(self._map_feed_error(resp, target_id=target_id))
+                msglist = resp.data.get("msglist") or []
+                if not msglist:
+                    raise RuntimeError(f"QQ {target_id} 暂无可见说说")
+                posts = QzoneParser.parse_feeds(msglist)
+            else:
+                resp = await self.qzone.get_recent_feeds()
+                if not resp.ok:
+                    raise RuntimeError(self._map_feed_error(resp))
+                posts = QzoneParser.parse_recent_feeds(resp.data)[pos : pos + num]
+                if not posts:
+                    raise RuntimeError("动态流暂无可见说说")
+            if with_detail:
+                self._set_query_cache(cache_key, posts)
 
         if no_self:
             uin = await self.session.get_uin()
@@ -65,6 +87,89 @@ class LitePostService:
             posts = await self._filter_not_commented(posts)
 
         return posts
+
+    def _cache_enabled(self) -> bool:
+        return int(self.cfg.feed_cache_max_size or 0) > 0 and int(self.cfg.feed_cache_ttl_seconds or 0) > 0
+
+    def _cache_expired(self, ts: float) -> bool:
+        return time.monotonic() - ts > int(self.cfg.feed_cache_ttl_seconds or 0)
+
+    @staticmethod
+    def _query_cache_key(target_id: str | None, pos: int, num: int) -> tuple[str, int, int]:
+        return (str(target_id or "__recent__"), int(pos), int(num))
+
+    @staticmethod
+    def _post_cache_key(post: Post) -> tuple[int, str] | None:
+        if not post.tid:
+            return None
+        return (int(post.uin), str(post.tid))
+
+    def _copy_post(self, post: Post) -> Post:
+        if hasattr(post, "model_copy"):
+            return post.model_copy(deep=True)
+        return post.copy(deep=True)
+
+    def _trim_cache(self) -> None:
+        max_size = int(self.cfg.feed_cache_max_size or 0)
+        while len(self._post_cache) > max_size:
+            self._post_cache.popitem(last=False)
+        while len(self._query_cache) > max_size:
+            self._query_cache.popitem(last=False)
+
+    def _get_cached_post(self, key: tuple[int, str]) -> Post | None:
+        if not self._cache_enabled():
+            return None
+        entry = self._post_cache.get(key)
+        if not entry:
+            return None
+        if self._cache_expired(entry.ts):
+            self._post_cache.pop(key, None)
+            return None
+        self._post_cache.move_to_end(key)
+        return self._copy_post(entry.post)
+
+    def _set_post_cache(self, post: Post) -> None:
+        if not self._cache_enabled():
+            return
+        key = self._post_cache_key(post)
+        if not key:
+            return
+        self._post_cache[key] = _PostCacheEntry(self._copy_post(post), time.monotonic())
+        self._post_cache.move_to_end(key)
+        self._trim_cache()
+
+    def _get_cached_query_posts(self, key: tuple[str, int, int]) -> list[Post]:
+        if not self._cache_enabled():
+            return []
+        entry = self._query_cache.get(key)
+        if not entry:
+            return []
+        if self._cache_expired(entry.ts):
+            self._query_cache.pop(key, None)
+            return []
+        posts = []
+        for post_key in entry.post_keys:
+            post = self._get_cached_post(post_key)
+            if not post:
+                return []
+            posts.append(post)
+        self._query_cache.move_to_end(key)
+        return posts
+
+    def _set_query_cache(self, key: tuple[str, int, int], posts: list[Post]) -> None:
+        if not self._cache_enabled():
+            return
+        post_keys = []
+        for post in posts:
+            post_key = self._post_cache_key(post)
+            if post_key:
+                post_keys.append(post_key)
+                self._set_post_cache(post)
+        if len(post_keys) != len(posts):
+            return
+        self._query_cache[key] = _QueryCacheEntry(post_keys, time.monotonic())
+        self._query_cache.move_to_end(key)
+        self._trim_cache()
 
     @staticmethod
     def _contains_any(text: str, keywords: tuple[str, ...]) -> bool:
@@ -142,7 +247,16 @@ class LitePostService:
             if not parsed:
                 logger.warning(f"解析详情失败：{resp.data}")
                 continue
-            result.append(parsed[0])
+            detailed = parsed[0]
+            key = self._post_cache_key(detailed)
+            cached = self._get_cached_post(key) if key else None
+            if cached:
+                cached.comments = detailed.comments
+                self._set_post_cache(cached)
+                result.append(cached)
+                continue
+            self._set_post_cache(detailed)
+            result.append(detailed)
         return result
 
     async def _filter_not_commented(self, posts: list[Post]) -> list[Post]:
@@ -204,6 +318,7 @@ class LitePostService:
                 parent_tid=None,
             )
         )
+        self._set_post_cache(post)
 
     async def reply_comment(self, post: Post, index: int, content: str):
         if not post.tid:
@@ -234,3 +349,4 @@ class LitePostService:
                 parent_tid=comment.tid,
             )
         )
+        self._set_post_cache(post)
