@@ -11,6 +11,25 @@
     "hint": "是否在执行操作时返回反馈信息",
     "default": true
   },
+  "analyze_images_on_view_feed": {
+    "description": "查看说说时分析图片",
+    "type": "bool",
+    "hint": "开启后，查看说说/LLM 查看说说时，如果说说包含图片，会调用视觉模型分析图片并把结果追加到返回内容中",
+    "default": false
+  },
+  "vision_provider_id": {
+    "description": "图片分析视觉模型",
+    "type": "string",
+    "hint": "请选择支持图片输入的模型提供商；留空或配置无效时使用当前正在使用的模型提供商",
+    "default": "",
+    "_special": "select_provider"
+  },
+  "vision_prompt": {
+    "description": "图片分析提示词",
+    "type": "text",
+    "hint": "用于指导视觉模型如何分析说说图片",
+    "default": "请分析这条 QQ 空间说说中的图片内容，用简洁中文概括图片里可见的主体、场景、文字和可能表达的情绪。不要编造看不见的信息。"
+  },
   "timeout": {
     "description": "请求超时时间",
     "type": "int",

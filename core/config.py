@@ -75,6 +75,12 @@ class ConfigNode:
 class PluginConfigLite(ConfigNode):
     cookies_str: str
     send_feedback: bool = True
+    analyze_images_on_view_feed: bool = False
+    vision_provider_id: str = ""
+    vision_prompt: str = (
+        "请分析这条 QQ 空间说说中的图片内容，用简洁中文概括图片里可见的主体、"
+        "场景、文字和可能表达的情绪。不要编造看不见的信息。"
+    )
     timeout: int
     request_interval: float
     request_jitter: float
@@ -87,6 +93,12 @@ class PluginConfigLite(ConfigNode):
         # 与 _conf_schema.json 对齐：缺失时写入默认值
         if self.send_feedback is None:
             self.send_feedback = True
+        if self.analyze_images_on_view_feed is None:
+            self.analyze_images_on_view_feed = False
+        if self.vision_provider_id is None:
+            self.vision_provider_id = ""
+        if self.vision_prompt is None:
+            self.vision_prompt = self.__class__.vision_prompt
         self.save_config()
 
     def update_cookies(self, cookies_str: str):

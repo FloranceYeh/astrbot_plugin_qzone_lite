@@ -5,6 +5,7 @@ from astrbot.core import AstrBotConfig
 from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
     AiocqhttpMessageEvent,
 )
+from astrbot.core.provider.provider import Provider
 
 from .core.config import PluginConfigLite
 from .core.qzone import QzoneAPI, QzoneSession
@@ -63,6 +64,35 @@ class QzoneLitePlugin(Star):
             event.stop_event()
             return []
 
+    async def _analyze_post_images(self, post) -> None:
+        if not self.cfg.analyze_images_on_view_feed or not post.images:
+            return
+
+        provider = (
+            self.context.get_provider_by_id(self.cfg.vision_provider_id)
+            or self.context.get_using_provider()
+        )
+        if not isinstance(provider, Provider):
+            post.extra_text = "图片分析失败：未配置可用的视觉模型提供商"
+            return
+
+        prompt = (
+            f"说说发布者：{post.name}({post.uin})\n"
+            f"说说正文：{post.text or '(无文字)'}\n"
+            f"转发内容：{post.rt_con or '(无转发内容)'}\n"
+            "请只根据图片和以上上下文返回图片内容分析。"
+        )
+        try:
+            response = await provider.text_chat(
+                system_prompt=self.cfg.vision_prompt,
+                prompt=prompt,
+                image_urls=post.images,
+            )
+            post.extra_text = (response.completion_text or "").strip()
+        except Exception as e:
+            logger.error(e)
+            post.extra_text = f"图片分析失败：{e}"
+
     # =========================
     # Commands
     # =========================
@@ -71,6 +101,7 @@ class QzoneLitePlugin(Star):
     async def view_feed(self, event: AiocqhttpMessageEvent):
         posts = await self._get_posts(event, with_detail=True)
         for post in posts:
+            await self._analyze_post_images(post)
             await self.sender.send_post(event, post)
 
     @filter.permission_type(filter.PermissionType.ADMIN)
@@ -172,6 +203,7 @@ class QzoneLitePlugin(Star):
             if not posts:
                 return "查询结果为空"
             post = posts[0]
+            await self._analyze_post_images(post)
             if self.cfg.send_feedback:
                 await self.sender.send_post(event, post)
             return self._format_post_for_llm(post)

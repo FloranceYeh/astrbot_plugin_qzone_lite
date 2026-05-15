@@ -109,6 +109,8 @@ class Post(pydantic.BaseModel):
         if self.images:
             lines.append("\n图片：")
             lines.extend(self.images)
+        if self.extra_text:
+            lines.append(f"\n图片分析：\n{self.extra_text}")
         if self.videos:
             lines.append("\n视频：")
             lines.extend(self.videos)
