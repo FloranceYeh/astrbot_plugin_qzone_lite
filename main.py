@@ -186,7 +186,7 @@ class QzoneLitePlugin(Star):
         user_id: str | None = None,
         pos: int = 0,
     ) -> str:
-        """查看某位用户的说说（轻量版）。
+        """查看某位用户的说说。
 
         Args:
             user_id(string): 目标 QQ 号，默认当前会话发送者
@@ -218,7 +218,7 @@ class QzoneLitePlugin(Star):
         text: str = "",
         get_image: bool = True,
     ) -> str:
-        """发布一条说说（轻量版）。
+        """发布一条说说。
 
         Args:
             text(string): 说说正文
@@ -242,7 +242,7 @@ class QzoneLitePlugin(Star):
         pos: int = 0,
         content: str = "",
     ) -> str:
-        """评论一条说说（轻量版：必须提供 content）。
+        """评论一条说说（必须提供 content）。
 
         Args:
             user_id(string): 目标 QQ 号，默认当前会话发送者
@@ -280,7 +280,7 @@ class QzoneLitePlugin(Star):
         reply_index: int = -1,
         content: str = "",
     ) -> str:
-        """回复某条说说下的评论（轻量版：必须提供 content）。
+        """回复某条说说下的评论（必须提供 content）。
 
         Args:
             user_id(string): 目标 QQ 号，默认当前会话发送者
