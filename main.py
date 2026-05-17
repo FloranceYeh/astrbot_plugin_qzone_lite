@@ -120,6 +120,27 @@ class QzoneLitePlugin(Star):
             yield event.plain_result(str(e))
             logger.error(e)
 
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("删说说", alias={"删除说说"})
+    async def delete_feed(self, event: AiocqhttpMessageEvent):
+        posts = await self._get_posts(event, target_id=event.get_self_id(), with_detail=False)
+        if not posts:
+            await event.send(event.plain_result("没有找到要删除的说说"))
+            return
+        deleted_count = 0
+        failed_count = 0
+        for post in posts:
+            try:
+                await self.service.delete_post(post)
+                deleted_count += 1
+                if self.cfg.send_feedback:
+                    await self.sender.send_post(event, post, message="已删除说说")
+            except Exception as e:
+                failed_count += 1
+                await event.send(event.plain_result(str(e)))
+                logger.error(e)
+        await event.send(event.plain_result(f"删除完成：成功 {deleted_count} 条，失败 {failed_count} 条"))
+
     @filter.command("评说说", alias={"评论说说", "读说说"})
     async def comment_feed(self, event: AiocqhttpMessageEvent):
         target_id, pos, num, content = parse_comment_args(event)
