@@ -144,3 +144,28 @@ def parse_reply_args(
 
     content = " ".join(filtered[idx + 2 :]).strip()
     return target_id, pos, comment_index, content
+
+
+def parse_publish_args(event: AiocqhttpMessageEvent) -> tuple[str, str | None]:
+    """解析 `发说说 [可见性参数] <内容>`。
+
+    可见性参数为可选，仅在显式提供时生效，支持以下前缀：
+    - 可见性=
+    - visibility=
+    - --visibility=
+    """
+
+    body = event.message_str.partition(" ")[2].strip()
+    if not body:
+        return "", None
+
+    visibility_prefixes = ("可见性=", "visibility=", "--visibility=")
+    for prefix in visibility_prefixes:
+        if body.startswith(prefix):
+            value_and_text = body[len(prefix) :].strip()
+            if not value_and_text:
+                return "", None
+            visibility, _, text = value_and_text.partition(" ")
+            return text.strip(), visibility.strip() or None
+
+    return body, None

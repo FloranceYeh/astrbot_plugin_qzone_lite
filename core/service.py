@@ -284,6 +284,7 @@ class LitePostService:
         post: Post | None = None,
         text: str | None = None,
         images: list | None = None,
+        visibility: str | None = None,
     ) -> Post:
         if post is None and not text and not images:
             raise ValueError("post、text、images 不能同时为空")
@@ -291,7 +292,7 @@ class LitePostService:
             uin = await self.session.get_uin()
             name = await self.session.get_nickname()
             post = Post(uin=uin, name=name, text=text or "", images=images or [])
-        resp = await self.qzone.publish(post)
+        resp = await self.qzone.publish(post, visibility=visibility)
         if not resp.ok:
             raise RuntimeError(f"发布说说失败：{resp.data}")
         post.tid = resp.data.get("tid")

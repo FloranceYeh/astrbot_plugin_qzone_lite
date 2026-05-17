@@ -16,7 +16,7 @@ QQ 空间轻量插件，基于上游项目裁剪而来。
 ## 命令
 
 - `看说说 [@用户] [序号/范围]`
-- `发说说 <文本> [图片]`（管理员）
+- `发说说 [可见性参数] <文本> [图片]`（管理员）
 - `评说说 [@用户] [序号/范围] <评论内容>`
 - `回评 [@用户] [说说序号] [评论序号] <回复内容>`
 - `赞说说 [@用户] [序号/范围]`
@@ -24,13 +24,14 @@ QQ 空间轻量插件，基于上游项目裁剪而来。
 说明：
 - 序号默认从 0/1 都可（两者都会指向最新一条）。
 - `回评` 的“评论序号”基于当前说说详情中的“全部评论列表”（包含自己的评论），与 `看说说` 展示序号一致。
+- `发说说` 支持可选可见性参数前缀：`可见性=`、`visibility=`、`--visibility=`（例如：`发说说 可见性=1 这是一条说说`）。
 
 ## LLM Tools
 
 - `llm_view_feed(user_id: str | None = None, pos: int = 0)`
   - 查看目标用户指定序号的说说（默认当前会话发送者，`0` 为最新）。
-- `llm_publish_feed(text: str = "", get_image: bool = True)`
-  - 发布说说，可选是否附带当前对话图片。
+- `llm_publish_feed(text: str = "", get_image: bool = True, visibility: str | None = None)`
+  - 发布说说，可选是否附带当前对话图片，可选可见性参数。
 - `llm_comment_feed(user_id: str | None = None, pos: int = 0, content: str = "")`
   - 评论指定说说，`content` 必填。
 - `llm_reply_comment(user_id: str | None = None, pos: int = 0, reply_index: int = -1, content: str = "")`

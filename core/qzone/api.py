@@ -54,22 +54,22 @@ class QzoneAPI(QzoneHttpClient):
         logger.debug(raw)
         return ApiResponse.from_raw(raw, code_key="ret", msg_key="msg")
 
-    async def publish(self, post: Post) -> ApiResponse:
+    async def publish(self, post: Post, visibility: str | None = None) -> ApiResponse:
         ctx = await self.session.get_ctx()
         data: dict[str, Any] = {
             "syn_tweet_verson": "1",
             "paramstr": "1",
-            "who": "1",
             "con": post.text,
             "feedversion": "1",
             "ver": "1",
-            "ugc_right": "1",
             "to_sign": "0",
             "hostuin": ctx.uin,
             "code_version": "1",
             "format": "json",
             "qzreferrer": f"{self.BASE_URL}/{ctx.uin}",
         }
+        if visibility is not None:
+            data["ugc_right"] = visibility
         if post.images:
             logger.debug(f"正在上传图片: {post.images}")
             pic_bos, richvals = [], []

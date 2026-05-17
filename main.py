@@ -15,6 +15,7 @@ from .core.utils import (
     get_ats,
     get_image_urls,
     parse_comment_args,
+    parse_publish_args,
     parse_range,
     parse_reply_args,
 )
@@ -109,10 +110,14 @@ class QzoneLitePlugin(Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("发说说")
     async def publish_feed(self, event: AiocqhttpMessageEvent):
-        text = event.message_str.partition(" ")[2]
+        text, visibility = parse_publish_args(event)
         images = await get_image_urls(event)
         try:
-            post = await self.service.publish_post(text=text, images=images)
+            post = await self.service.publish_post(
+                text=text,
+                images=images,
+                visibility=visibility,
+            )
             if self.cfg.send_feedback:
                 await self.sender.send_post(event, post, message="已发布")
             event.stop_event()
@@ -231,16 +236,22 @@ class QzoneLitePlugin(Star):
         event: AiocqhttpMessageEvent,
         text: str = "",
         get_image: bool = True,
+        visibility: str | None = None,
     ) -> str:
         """发布一条说说。
 
         Args:
             text(string): 说说正文
             get_image(boolean): 是否附带当前对话图片
+            visibility(string): 可见性参数（可选）
         """
         try:
             images = await get_image_urls(event) if get_image else []
-            post = await self.service.publish_post(text=text, images=images)
+            post = await self.service.publish_post(
+                text=text,
+                images=images,
+                visibility=visibility,
+            )
             if self.cfg.send_feedback:
                 await self.sender.send_post(event, post, message="已发布")
             return "已发布说说\n" + self._format_post_for_llm(post)
