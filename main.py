@@ -134,7 +134,7 @@ class QzoneLitePlugin(Star):
             except Exception as e:
                 await event.send(event.plain_result(str(e)))
                 logger.error(e)
-        if deleted_count > 0 and not self.cfg.send_feedback:
+        if not self.cfg.send_feedback:
             await event.send(event.plain_result(f"已删除 {deleted_count} 条说说"))
 
     @filter.command("评说说", alias={"评论说说", "读说说"})
