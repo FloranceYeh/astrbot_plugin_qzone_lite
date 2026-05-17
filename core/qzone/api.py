@@ -101,6 +101,9 @@ class QzoneAPI(QzoneHttpClient):
             timeout=30,
         ) as resp:
             text = await resp.text()
+        if not text:
+            logger.warning("获取 qzonetoken 失败：页面响应为空")
+            return ""
         match = re.search(r'g_qzonetoken\s*=\s*"([^"]+)"', text)
         if match:
             return match.group(1)
@@ -113,6 +116,7 @@ class QzoneAPI(QzoneHttpClient):
         params = {"g_tk": ctx.gtk2}
         if qzonetoken:
             params["qzonetoken"] = qzonetoken
+        mood_url = f"http://user.qzone.qq.com/{post.uin}/mood/{post.tid}"
 
         raw = await self.request(
             "POST",
@@ -121,8 +125,8 @@ class QzoneAPI(QzoneHttpClient):
             data={
                 "qzreferrer": f"{self.BASE_URL}/{ctx.uin}",
                 "opuin": ctx.uin,
-                "unikey": f"http://user.qzone.qq.com/{post.uin}/mood/{post.tid}",
-                "curkey": f"http://user.qzone.qq.com/{post.uin}/mood/{post.tid}",
+                "unikey": mood_url,
+                "curkey": mood_url,
                 "appid": 311,
                 "from": 1,
                 "typeid": 0,

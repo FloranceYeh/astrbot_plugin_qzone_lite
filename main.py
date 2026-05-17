@@ -153,7 +153,7 @@ class QzoneLitePlugin(Star):
         posts = await self._get_posts(event, with_detail=False)
         for post in posts:
             try:
-                await self.service.like_posts(post)
+                await self.service.like_post(post)
                 if self.cfg.send_feedback:
                     await self.sender.send_post(event, post, message="已点赞")
             except Exception as e:
@@ -348,7 +348,7 @@ class QzoneLitePlugin(Star):
             if not posts:
                 return "查询结果为空"
             post = posts[0]
-            await self.service.like_posts(post)
+            await self.service.like_post(post)
             if self.cfg.send_feedback:
                 await self.sender.send_post(event, post, message="已点赞")
             return "已点赞\n" + self._format_post_for_llm(post)

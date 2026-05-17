@@ -299,7 +299,7 @@ class LitePostService:
         post.create_time = resp.data.get("now", post.create_time)
         return post
 
-    async def like_posts(self, post: Post):
+    async def like_post(self, post: Post):
         if not post.tid:
             raise ValueError("帖子 tid 为空")
         resp = await self.qzone.like(post)
