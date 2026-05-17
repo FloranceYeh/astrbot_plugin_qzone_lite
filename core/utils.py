@@ -166,6 +166,6 @@ def parse_publish_args(event: AiocqhttpMessageEvent) -> tuple[str, str | None]:
             if not value_and_text:
                 return "", None
             visibility, _, text = value_and_text.partition(" ")
-            return text.strip(), visibility.strip() or None
+            return text.strip(), visibility.strip()
 
     return body, None
