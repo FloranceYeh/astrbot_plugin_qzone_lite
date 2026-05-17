@@ -125,6 +125,7 @@ class QzoneLitePlugin(Star):
     async def delete_feed(self, event: AiocqhttpMessageEvent):
         posts = await self._get_posts(event, target_id=event.get_self_id(), with_detail=False)
         deleted_count = 0
+        failed_count = 0
         for post in posts:
             try:
                 await self.service.delete_post(post)
@@ -132,10 +133,10 @@ class QzoneLitePlugin(Star):
                 if self.cfg.send_feedback:
                     await self.sender.send_post(event, post, message="已删除说说")
             except Exception as e:
+                failed_count += 1
                 await event.send(event.plain_result(str(e)))
                 logger.error(e)
-        if not self.cfg.send_feedback:
-            await event.send(event.plain_result(f"已删除 {deleted_count} 条说说"))
+        await event.send(event.plain_result(f"删除完成：成功 {deleted_count} 条，失败 {failed_count} 条"))
 
     @filter.command("评说说", alias={"评论说说", "读说说"})
     async def comment_feed(self, event: AiocqhttpMessageEvent):

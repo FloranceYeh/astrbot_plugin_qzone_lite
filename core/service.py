@@ -315,6 +315,7 @@ class LitePostService:
             raise RuntimeError(f"删除说说失败：{resp.message}")
         key = self._post_cache_key(post)
         if not key:
+            logger.debug(f"删除说说后跳过缓存清理：无效 cache key, tid={post.tid}")
             return
         self._post_cache.pop(key, None)
         for query_key, entry in list(self._query_cache.items()):
