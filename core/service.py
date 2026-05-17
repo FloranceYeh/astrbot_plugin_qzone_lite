@@ -286,6 +286,12 @@ class LitePostService:
         images: list | None = None,
         visibility: str | None = None,
     ) -> Post:
+        if visibility is not None:
+            visibility = visibility.strip()
+            if not visibility:
+                visibility = None
+            elif not visibility.isdigit():
+                raise ValueError("可见性参数必须是数字字符串")
         if post is None and not text and not images:
             raise ValueError("post、text、images 不能同时为空")
         if post is None:
