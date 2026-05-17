@@ -33,6 +33,8 @@ QQ 空间轻量插件，基于上游项目裁剪而来。
   - 查看目标用户指定序号的说说（默认当前会话发送者，`0` 为最新）。
 - `llm_publish_feed(text: str = "", get_image: bool = True)`
   - 发布说说，可选是否附带当前对话图片。
+- `llm_delete_feed(user_id: str | None = None, pos: int = 0)`
+  - 删除指定说说，仅能删除自己的说说。
 - `llm_comment_feed(user_id: str | None = None, pos: int = 0, content: str = "")`
   - 评论指定说说，`content` 必填。
 - `llm_reply_comment(user_id: str | None = None, pos: int = 0, reply_index: int = -1, content: str = "")`
