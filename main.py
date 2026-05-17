@@ -124,6 +124,9 @@ class QzoneLitePlugin(Star):
     @filter.command("删说说", alias={"删除说说"})
     async def delete_feed(self, event: AiocqhttpMessageEvent):
         posts = await self._get_posts(event, target_id=event.get_self_id(), with_detail=False)
+        if not posts:
+            await event.send(event.plain_result("没有找到要删除的说说"))
+            return
         deleted_count = 0
         failed_count = 0
         for post in posts:

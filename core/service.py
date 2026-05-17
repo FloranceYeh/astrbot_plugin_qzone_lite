@@ -318,7 +318,10 @@ class LitePostService:
             logger.debug(f"删除说说后跳过缓存清理：无效 cache key, tid={post.tid}")
             return
         self._post_cache.pop(key, None)
-        for query_key, entry in list(self._query_cache.items()):
+        for query_key in list(self._query_cache.keys()):
+            entry = self._query_cache.get(query_key)
+            if not entry:
+                continue
             if key in entry.post_keys:
                 self._query_cache.pop(query_key, None)
 
