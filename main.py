@@ -270,6 +270,39 @@ class QzoneLitePlugin(Star):
             return str(e)
 
     @filter.llm_tool()
+    async def llm_delete_feef(
+        self,
+        event: AiocqhttpMessageEvent,
+        user_id: str | None = None,
+        pos: int = 0,
+    ) -> str:
+        """删除某位用户的一条说说。
+
+        Args:
+            user_id(string): 目标 QQ 号，默认当前会话发送者
+            pos(number): 说说序号（0 表示最新）
+        """
+        try:
+            target = user_id or event.get_sender_id()
+            posts = await self.service.query_feeds(
+                target_id=target,
+                pos=pos,
+                num=1,
+                with_detail=False,
+            )
+            if not posts:
+                return "查询结果为空"
+            post = posts[0]
+            await self.service.delete_post(post)
+            if self.cfg.send_feedback:
+                await self.sender.send_post(event, post, message="已删除说说")
+            return "已删除说说\n" + self._format_post_for_llm(post)
+        except Exception as e:
+            logger.error(e)
+            return str(e
+    )
+
+    @filter.llm_tool()
     async def llm_comment_feed(
         self,
         event: AiocqhttpMessageEvent,
