@@ -164,8 +164,11 @@ def parse_publish_args(event: AiocqhttpMessageEvent) -> tuple[str, str | None]:
         if body.startswith(prefix):
             value_and_text = body[len(prefix) :].strip()
             if not value_and_text:
-                return "", None
+                return body, None
             visibility, _, text = value_and_text.partition(" ")
-            return text.strip(), visibility.strip()
+            visibility = visibility.strip()
+            if not visibility or not visibility.isdigit():
+                return body, None
+            return text.strip(), visibility
 
     return body, None
