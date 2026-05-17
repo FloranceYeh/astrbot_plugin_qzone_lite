@@ -107,7 +107,7 @@ class QzoneAPI(QzoneHttpClient):
         match = re.search(r'g_qzonetoken\s*=\s*"([^"]+)"', text)
         if match:
             return match.group(1)
-        logger.warning("未能获取 qzonetoken")
+        logger.warning(f"未能获取 qzonetoken，响应长度={len(text)}")
         return ""
 
     async def like(self, post: Post) -> ApiResponse:

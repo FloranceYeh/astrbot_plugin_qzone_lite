@@ -25,12 +25,13 @@ class QzoneContext:
         return str(hash_val & 0x7FFFFFFF)
 
     def cookies(self) -> dict[str, str]:
+        o_uin = f"o{self.uin}"
         return {
-            "uin": f"o{self.uin}",
+            "uin": o_uin,
             "skey": self.skey,
             "p_skey": self.p_skey,
-            "pt2gguin": self._raw_cookies.get("pt2gguin", f"o{self.uin}"),
-            "p_uin": self._raw_cookies.get("p_uin", f"o{self.uin}"),
+            "pt2gguin": self._raw_cookies.get("pt2gguin", o_uin),
+            "p_uin": self._raw_cookies.get("p_uin", o_uin),
             "ptcz": self._raw_cookies.get("ptcz", ""),
             "RK": self._raw_cookies.get("RK", ""),
             "pt4_token": self._raw_cookies.get("pt4_token", ""),
