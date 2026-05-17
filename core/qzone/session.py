@@ -63,6 +63,7 @@ class QzoneSession:
             uin=uin,
             skey=c.get("skey", ""),
             p_skey=c.get("p_skey", ""),
+            raw_cookies=c,
         )
 
         logger.info(f"登录成功，uin={uin}")

@@ -1,4 +1,5 @@
 import base64
+import re
 import time
 from typing import Any
 
@@ -87,6 +88,50 @@ class QzoneAPI(QzoneHttpClient):
             self.EMOTION_URL,
             params={"g_tk": ctx.gtk2, "uin": ctx.uin},
             data=data,
+        )
+        return ApiResponse.from_raw(raw)
+
+    async def _get_qzonetoken(self) -> str:
+        ctx = await self.session.get_ctx()
+        async with self._session.request(
+            "GET",
+            f"{self.BASE_URL}/{ctx.uin}",
+            headers=ctx.headers(),
+            cookies=ctx.cookies(),
+            timeout=30,
+        ) as resp:
+            text = await resp.text()
+        match = re.search(r'g_qzonetoken\s*=\s*"([^"]+)"', text)
+        if match:
+            return match.group(1)
+        logger.warning("未能获取 qzonetoken")
+        return ""
+
+    async def like(self, post: Post) -> ApiResponse:
+        ctx = await self.session.get_ctx()
+        qzonetoken = await self._get_qzonetoken()
+        params = {"g_tk": ctx.gtk2}
+        if qzonetoken:
+            params["qzonetoken"] = qzonetoken
+
+        raw = await self.request(
+            "POST",
+            self.DOLIKE_URL,
+            params=params,
+            data={
+                "qzreferrer": f"{self.BASE_URL}/{ctx.uin}",
+                "opuin": ctx.uin,
+                "unikey": f"http://user.qzone.qq.com/{post.uin}/mood/{post.tid}",
+                "curkey": f"http://user.qzone.qq.com/{post.uin}/mood/{post.tid}",
+                "appid": 311,
+                "from": 1,
+                "typeid": 0,
+                "abstime": int(time.time()),
+                "fid": post.tid,
+                "active": 0,
+                "format": "json",
+                "fupdate": 1,
+            },
         )
         return ApiResponse.from_raw(raw)
 

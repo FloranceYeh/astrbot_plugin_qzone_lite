@@ -148,6 +148,18 @@ class QzoneLitePlugin(Star):
                 await event.send(event.plain_result(str(e)))
                 logger.error(e)
 
+    @filter.command("赞说说", alias={"点赞说说"})
+    async def like_feed(self, event: AiocqhttpMessageEvent):
+        posts = await self._get_posts(event, with_detail=False)
+        for post in posts:
+            try:
+                await self.service.like_posts(post)
+                if self.cfg.send_feedback:
+                    await self.sender.send_post(event, post, message="已点赞")
+            except Exception as e:
+                await event.send(event.plain_result(str(e)))
+                logger.error(e)
+
     @filter.command("回评", alias={"回复评论"})
     async def reply_comment(self, event: AiocqhttpMessageEvent):
         target_id, pos, comment_index, content = parse_reply_args(event)
@@ -308,6 +320,38 @@ class QzoneLitePlugin(Star):
             if self.cfg.send_feedback:
                 await self.sender.send_post(event, post, message="已回复评论")
             return "已回复评论\n" + self._format_post_for_llm(post)
+        except Exception as e:
+            logger.error(e)
+            return str(e)
+
+    @filter.llm_tool()
+    async def llm_like_feed(
+        self,
+        event: AiocqhttpMessageEvent,
+        user_id: str | None = None,
+        pos: int = 0,
+    ) -> str:
+        """点赞某位用户的说说。
+
+        Args:
+            user_id(string): 目标 QQ 号，默认当前会话发送者
+            pos(number): 说说序号（0 表示最新）
+        """
+        try:
+            target = user_id or event.get_sender_id()
+            posts = await self.service.query_feeds(
+                target_id=target,
+                pos=pos,
+                num=1,
+                with_detail=False,
+            )
+            if not posts:
+                return "查询结果为空"
+            post = posts[0]
+            await self.service.like_posts(post)
+            if self.cfg.send_feedback:
+                await self.sender.send_post(event, post, message="已点赞")
+            return "已点赞\n" + self._format_post_for_llm(post)
         except Exception as e:
             logger.error(e)
             return str(e)
