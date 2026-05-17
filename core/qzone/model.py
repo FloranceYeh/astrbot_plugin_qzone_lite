@@ -5,10 +5,17 @@ from .constants import QZONE_CODE_OK, QZONE_CODE_UNKNOWN, QZONE_INTERNAL_META_KE
 
 
 class QzoneContext:
-    def __init__(self, uin: int, skey: str, p_skey: str):
+    def __init__(
+        self,
+        uin: int,
+        skey: str,
+        p_skey: str,
+        raw_cookies: dict[str, str] | None = None,
+    ):
         self.uin = uin
         self.skey = skey
         self.p_skey = p_skey
+        self._raw_cookies = raw_cookies or {}
 
     @property
     def gtk2(self) -> str:
@@ -18,7 +25,19 @@ class QzoneContext:
         return str(hash_val & 0x7FFFFFFF)
 
     def cookies(self) -> dict[str, str]:
-        return {"uin": f"o{self.uin}", "skey": self.skey, "p_skey": self.p_skey}
+        o_uin = f"o{self.uin}"
+        return {
+            "uin": o_uin,
+            "skey": self.skey,
+            "p_skey": self.p_skey,
+            "pt2gguin": self._raw_cookies.get("pt2gguin", o_uin),
+            "p_uin": self._raw_cookies.get("p_uin", o_uin),
+            "ptcz": self._raw_cookies.get("ptcz", ""),
+            "RK": self._raw_cookies.get("RK", ""),
+            "pt4_token": self._raw_cookies.get("pt4_token", ""),
+            "pt_recent_uins": self._raw_cookies.get("pt_recent_uins", ""),
+            "qzone_check": self._raw_cookies.get("qzone_check", ""),
+        }
 
     def headers(self) -> dict[str, str]:
         return {
