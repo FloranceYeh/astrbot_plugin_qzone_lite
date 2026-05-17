@@ -6,6 +6,8 @@ from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
     AiocqhttpMessageEvent,
 )
 
+SUPPORTED_IMAGE_PROTOCOLS = ("http://", "https://", "base64://", "data:image/")
+
 
 def get_ats(event: AiocqhttpMessageEvent) -> list[str]:
     ats = [str(seg.qq) for seg in event.get_messages()[1:] if isinstance(seg, At)]
@@ -46,6 +48,30 @@ def parse_range(event: AstrMessageEvent) -> tuple[int, int]:
     return pos, num
 
 
+def _extract_image_source(seg: Image) -> str | None:
+    candidates: list[str] = []
+    for key in ("url", "file", "src", "data_url"):
+        value = getattr(seg, key, None)
+        if isinstance(value, str) and value.strip():
+            candidates.append(value.strip())
+
+    raw = getattr(seg, "raw", None)
+    if isinstance(raw, dict):
+        for key in ("url", "file", "src"):
+            value = raw.get(key)
+            if isinstance(value, str) and value.strip():
+                candidates.append(value.strip())
+
+    for value in candidates:
+        if value.startswith("data:image/"):
+            if ";base64," in value:
+                return value
+            continue
+        if value.startswith(SUPPORTED_IMAGE_PROTOCOLS):
+            return value
+    return None
+
+
 async def get_image_urls(event: AstrMessageEvent, reply: bool = True) -> list[str]:
     chain = event.get_messages()
     images: list[str] = []
@@ -53,12 +79,16 @@ async def get_image_urls(event: AstrMessageEvent, reply: bool = True) -> list[st
         reply_seg = next((seg for seg in chain if isinstance(seg, Reply)), None)
         if reply_seg and reply_seg.chain:
             for seg in reply_seg.chain:
-                if isinstance(seg, Image) and seg.url:
-                    images.append(seg.url)
+                if isinstance(seg, Image):
+                    source = _extract_image_source(seg)
+                    if source:
+                        images.append(source)
     for seg in chain:
-        if isinstance(seg, Image) and seg.url:
-            images.append(seg.url)
-    return images
+        if isinstance(seg, Image):
+            source = _extract_image_source(seg)
+            if source:
+                images.append(source)
+    return list(dict.fromkeys(images))
 
 
 def parse_comment_args(event: AiocqhttpMessageEvent) -> tuple[str | None, int, int, str]:
