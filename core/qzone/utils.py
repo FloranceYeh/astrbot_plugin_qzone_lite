@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 import asyncio
 import base64
+import binascii
 import ipaddress
 import socket
 from typing import Union
@@ -93,9 +94,8 @@ def _decode_base64_image(data: str) -> bytes | None:
         return None
     try:
         payload += "=" * (-len(payload) % 4)
-        content = base64.b64decode(payload, validate=False)
-        return content or None
-    except Exception:
+        return base64.b64decode(payload, validate=True)
+    except (ValueError, binascii.Error):
         return None
 
 
@@ -107,7 +107,8 @@ async def normalize_images(images: Sequence[BytesOrStr] | None) -> list[bytes]:
         if isinstance(item, bytes):
             cleaned.append(item)
         elif isinstance(item, str):
-            if image_bytes := _decode_base64_image(item):
+            image_bytes = _decode_base64_image(item)
+            if image_bytes is not None and len(image_bytes) > 0:
                 cleaned.append(image_bytes)
                 continue
             file = await download_file(item)

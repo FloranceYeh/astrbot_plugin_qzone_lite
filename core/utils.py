@@ -6,6 +6,8 @@ from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
     AiocqhttpMessageEvent,
 )
 
+SUPPORTED_IMAGE_PROTOCOLS = ("http://", "https://", "base64://", "data:image/")
+
 
 def get_ats(event: AiocqhttpMessageEvent) -> list[str]:
     ats = [str(seg.qq) for seg in event.get_messages()[1:] if isinstance(seg, At)]
@@ -61,7 +63,11 @@ def _extract_image_source(seg: Image) -> str | None:
                 candidates.append(value.strip())
 
     for value in candidates:
-        if value.startswith(("http://", "https://", "base64://", "data:image/")):
+        if value.startswith("data:image/"):
+            if ";base64," in value:
+                return value
+            continue
+        if value.startswith(SUPPORTED_IMAGE_PROTOCOLS):
             return value
     return None
 
