@@ -307,6 +307,20 @@ class LitePostService:
             raise RuntimeError(f"点赞失败：{resp.message}")
         self._set_post_cache(post)
 
+    async def delete_post(self, post: Post):
+        if not post.tid:
+            raise ValueError("帖子 tid 为空")
+        resp = await self.qzone.delete(post.tid)
+        if not resp.ok:
+            raise RuntimeError(f"删除说说失败：{resp.message}")
+        key = self._post_cache_key(post)
+        if not key:
+            return
+        self._post_cache.pop(key, None)
+        for query_key, entry in list(self._query_cache.items()):
+            if key in entry.post_keys:
+                self._query_cache.pop(query_key, None)
+
     async def comment_posts(self, post: Post, content: str):
         if not post.tid:
             raise ValueError("帖子 tid 为空")
