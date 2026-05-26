@@ -40,6 +40,12 @@ class QzoneSession:
         async with self._lock:
             self._ctx = None
 
+    async def reset_login_state(self, *, clear_cookies: bool = False) -> None:
+        async with self._lock:
+            self._ctx = None
+            if clear_cookies:
+                self.cfg.update_cookies("")
+
     async def login(self, cookies_str: str | None = None) -> QzoneContext:
         logger.info("正在登录 QQ 空间")
 

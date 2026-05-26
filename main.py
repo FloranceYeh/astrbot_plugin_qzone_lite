@@ -184,8 +184,7 @@ class QzoneLitePlugin(Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("重置QQCookies", alias={"重置cookies", "重置QQ cookies"})
     async def reset_cookies(self, event: AiocqhttpMessageEvent):
-        self.cfg.update_cookies("")
-        await self.session.invalidate()
+        await self.session.reset_login_state(clear_cookies=True)
         await event.send(event.plain_result("QQ Cookies 已重置，下次需要时会重新获取"))
 
     @filter.command("回评", alias={"回复评论"})

@@ -5,6 +5,12 @@
     "hint": "选填，用于维持 QQ 空间登录态；留空则自动从 aiocqhttp 客户端获取",
     "default": ""
   },
+  "auto_reset_on_login_expired": {
+    "description": "登录失效时自动重置",
+    "type": "bool",
+    "hint": "当检测到 QQ 空间登录失效时，自动清空已保存的 Cookies 并重新从 CQHTTP 获取登录态",
+    "default": true
+  },
   "send_feedback": {
     "description": "发送反馈",
     "type": "bool",

@@ -70,7 +70,10 @@ class QzoneHttpClient:
         if resp.status == HTTP_STATUS_UNAUTHORIZED or parsed.get("code") == QZONE_CODE_LOGIN_EXPIRED:
             if retry >= self.MAX_RETRIES:
                 raise RuntimeError("登录失效，重试失败")
-            logger.warning("登录失效，重新登录中")
+            logger.warning("登录失效，正在重置状态并重新登录")
+            await self.session.reset_login_state(
+                clear_cookies=bool(self.cfg.auto_reset_on_login_expired)
+            )
             await self.session.login()
             return await self.request(
                 method,

@@ -74,6 +74,7 @@ class ConfigNode:
 
 class PluginConfigLite(ConfigNode):
     cookies_str: str
+    auto_reset_on_login_expired: bool = True
     send_feedback: bool = True
     analyze_images_on_view_feed: bool = False
     vision_provider_id: str = ""
@@ -93,6 +94,8 @@ class PluginConfigLite(ConfigNode):
         self.client: CQHttp | None = None
 
         # 与 _conf_schema.json 对齐：缺失时写入默认值
+        if self.auto_reset_on_login_expired is None:
+            self.auto_reset_on_login_expired = True
         if self.send_feedback is None:
             self.send_feedback = True
         if self.analyze_images_on_view_feed is None:
