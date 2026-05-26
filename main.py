@@ -181,6 +181,13 @@ class QzoneLitePlugin(Star):
                 await event.send(event.plain_result(str(e)))
                 logger.error(e)
 
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("重置QQCookies", alias={"重置cookies", "重置QQ cookies"})
+    async def reset_cookies(self, event: AiocqhttpMessageEvent):
+        self.cfg.update_cookies("")
+        await self.session.invalidate()
+        await event.send(event.plain_result("QQ Cookies 已重置，下次需要时会重新获取"))
+
     @filter.command("回评", alias={"回复评论"})
     async def reply_comment(self, event: AiocqhttpMessageEvent):
         target_id, pos, comment_index, content = parse_reply_args(event)
