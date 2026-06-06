@@ -30,11 +30,11 @@ class QzoneAPI(QzoneHttpClient):
         super().__init__(session, config)
 
     async def _upload_image(self, image: bytes) -> ApiResponse:
-        ctx = await self.session.get_ctx()
+        encoded = base64.b64encode(image).decode()
         raw = await self.request(
             "POST",
             self.UPLOAD_IMAGE_URL,
-            data={
+            data=lambda ctx: {
                 "filename": "filename",
                 "uploadtype": "1",
                 "albumtype": "7",
@@ -43,9 +43,9 @@ class QzoneAPI(QzoneHttpClient):
                 "p_skey": ctx.p_skey,
                 "output_type": "json",
                 "base64": "1",
-                "picfile": base64.b64encode(image).decode(),
+                "picfile": encoded,
             },
-            headers={
+            headers=lambda ctx: {
                 "referer": f"{self.BASE_URL}/{ctx.uin}",
                 "origin": self.BASE_URL,
             },
@@ -55,7 +55,6 @@ class QzoneAPI(QzoneHttpClient):
         return ApiResponse.from_raw(raw, code_key="ret", msg_key="msg")
 
     async def publish(self, post: Post) -> ApiResponse:
-        ctx = await self.session.get_ctx()
         data: dict[str, Any] = {
             "syn_tweet_verson": "1",
             "paramstr": "1",
@@ -65,10 +64,8 @@ class QzoneAPI(QzoneHttpClient):
             "ver": "1",
             "ugc_right": "1",
             "to_sign": "0",
-            "hostuin": ctx.uin,
             "code_version": "1",
             "format": "json",
-            "qzreferrer": f"{self.BASE_URL}/{ctx.uin}",
         }
         if post.images:
             logger.debug(f"正在上传图片: {post.images}")
@@ -86,21 +83,22 @@ class QzoneAPI(QzoneHttpClient):
         raw = await self.request(
             "POST",
             self.EMOTION_URL,
-            params={"g_tk": ctx.gtk2, "uin": ctx.uin},
-            data=data,
+            params=lambda ctx: {"g_tk": ctx.gtk2, "uin": ctx.uin},
+            data=lambda ctx: {
+                **data,
+                "hostuin": ctx.uin,
+                "qzreferrer": f"{self.BASE_URL}/{ctx.uin}",
+            },
         )
         return ApiResponse.from_raw(raw)
 
     async def _get_qzonetoken(self) -> str:
-        ctx = await self.session.get_ctx()
-        async with self._session.request(
+        _, text = await self.request_text(
             "GET",
-            f"{self.BASE_URL}/{ctx.uin}",
-            headers=ctx.headers(),
-            cookies=ctx.cookies(),
+            lambda ctx: f"{self.BASE_URL}/{ctx.uin}",
+            headers=lambda ctx: ctx.headers(),
             timeout=30,
-        ) as resp:
-            text = await resp.text()
+        )
         if not text:
             logger.warning("获取 qzonetoken 失败：页面响应为空")
             return ""
@@ -111,18 +109,17 @@ class QzoneAPI(QzoneHttpClient):
         return ""
 
     async def like(self, post: Post) -> ApiResponse:
-        ctx = await self.session.get_ctx()
         qzonetoken = await self._get_qzonetoken()
-        params = {"g_tk": ctx.gtk2}
-        if qzonetoken:
-            params["qzonetoken"] = qzonetoken
         mood_url = f"http://user.qzone.qq.com/{post.uin}/mood/{post.tid}"
 
         raw = await self.request(
             "POST",
             self.DOLIKE_URL,
-            params=params,
-            data={
+            params=lambda ctx: {
+                "g_tk": ctx.gtk2,
+                **({"qzonetoken": qzonetoken} if qzonetoken else {}),
+            },
+            data=lambda ctx: {
                 "qzreferrer": f"{self.BASE_URL}/{ctx.uin}",
                 "opuin": ctx.uin,
                 "unikey": mood_url,
@@ -140,12 +137,11 @@ class QzoneAPI(QzoneHttpClient):
         return ApiResponse.from_raw(raw)
 
     async def comment(self, post: Post, content: str) -> ApiResponse:
-        ctx = await self.session.get_ctx()
         raw = await self.request(
             "POST",
             self.COMMENT_URL,
-            params={"g_tk": ctx.gtk2},
-            data={
+            params=lambda ctx: {"g_tk": ctx.gtk2},
+            data=lambda ctx: {
                 "topicId": f"{post.uin}_{post.tid}__1",
                 "uin": ctx.uin,
                 "hostUin": post.uin,
@@ -163,12 +159,11 @@ class QzoneAPI(QzoneHttpClient):
         return ApiResponse.from_raw(raw)
 
     async def reply(self, post: Post, comment: Comment, content: str) -> ApiResponse:
-        ctx = await self.session.get_ctx()
         raw = await self.request(
             "POST",
             self.REPLY_URL,
-            params={"g_tk": ctx.gtk2},
-            data={
+            params=lambda ctx: {"g_tk": ctx.gtk2},
+            data=lambda ctx: {
                 "topicId": f"{post.uin}_{post.tid}__1",
                 "uin": ctx.uin,
                 "hostUin": post.uin,
@@ -193,12 +188,11 @@ class QzoneAPI(QzoneHttpClient):
         return ApiResponse.from_raw(raw)
 
     async def delete(self, tid: str) -> ApiResponse:
-        ctx = await self.session.get_ctx()
         raw = await self.request(
             "POST",
             self.DELETE_URL,
-            params={"g_tk": ctx.gtk2},
-            data={
+            params=lambda ctx: {"g_tk": ctx.gtk2},
+            data=lambda ctx: {
                 "uin": ctx.uin,
                 "topicId": f"{ctx.uin}_{tid}__1",
                 "feedsType": 0,
@@ -214,11 +208,10 @@ class QzoneAPI(QzoneHttpClient):
         return ApiResponse.from_raw(raw)
 
     async def get_feeds(self, target_id: str, *, pos: int = 0, num: int = 1) -> ApiResponse:
-        ctx = await self.session.get_ctx()
         raw = await self.request(
             "GET",
             self.LIST_URL,
-            params={
+            params=lambda ctx: {
                 "g_tk": ctx.gtk2,
                 "uin": target_id,
                 "ftype": 0,
@@ -236,20 +229,23 @@ class QzoneAPI(QzoneHttpClient):
         return ApiResponse.from_raw(raw)
 
     async def get_detail(self, post: Post) -> ApiResponse:
-        ctx = await self.session.get_ctx()
         raw = await self.request(
             "GET",
             self.DETAIL_URL,
-            params={"uin": post.uin, "tid": post.tid, "format": "jsonp", "g_tk": ctx.gtk2},
+            params=lambda ctx: {
+                "uin": post.uin,
+                "tid": post.tid,
+                "format": "jsonp",
+                "g_tk": ctx.gtk2,
+            },
         )
         return ApiResponse.from_raw(raw)
 
     async def get_recent_feeds(self, page: int = 1) -> ApiResponse:
-        ctx = await self.session.get_ctx()
         raw = await self.request(
             "GET",
             self.ZONE_LIST_URL,
-            params={
+            params=lambda ctx: {
                 "uin": ctx.uin,
                 "scope": 0,
                 "view": 1,
