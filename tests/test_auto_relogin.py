@@ -184,6 +184,14 @@ class AutoReloginTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(parsed["code"], 0)
         self.assertEqual(parsed["data"]["text"], "a } brace")
 
+    def test_parse_response_skips_outer_jsonp_try_block(self):
+        raw = 'try{_preloadCallback({"code":0,"data":{"msglist":[]}});}catch(e){}'
+
+        parsed = QzoneParser.parse_response(raw)
+
+        self.assertEqual(parsed["code"], 0)
+        self.assertEqual(parsed["data"]["msglist"], [])
+
     async def test_get_feeds_rebuilds_params_after_relogin(self):
         old_ctx = QzoneContext(
             uin=10001,

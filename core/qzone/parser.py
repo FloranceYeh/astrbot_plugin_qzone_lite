@@ -23,11 +23,7 @@ class QzoneParser:
         return {"code": QZONE_CODE_UNKNOWN, "message": message, "data": {}}
 
     @staticmethod
-    def _extract_json_object(text: str) -> str | None:
-        start = text.find("{")
-        if start == -1:
-            return None
-
+    def _extract_json_object_from(text: str, start: int) -> str | None:
         depth = 0
         in_string = False
         quote = ""
@@ -59,6 +55,15 @@ class QzoneParser:
         return None
 
     @staticmethod
+    def _iter_json_objects(text: str):
+        for start, ch in enumerate(text):
+            if ch != "{":
+                continue
+            json_str = QzoneParser._extract_json_object_from(text, start)
+            if json_str is not None:
+                yield json_str
+
+    @staticmethod
     def parse_response(text: str, *, debug: bool = False) -> dict[str, Any]:
         if debug:
             logger.debug(f"响应数据: {text}")
@@ -66,25 +71,29 @@ class QzoneParser:
             logger.warning("响应内容为空")
             return QzoneParser._error_payload(QZONE_MSG_EMPTY_RESPONSE)
 
-        json_str = QzoneParser._extract_json_object(text)
-        if json_str is None:
+        parse_error: Exception | None = None
+        for json_str in QzoneParser._iter_json_objects(text):
+            json_str = json_str.replace("undefined", "null").strip()
+            try:
+                data = json5.loads(json_str)
+            except (ValueError, json.JSONDecodeError) as e:
+                parse_error = e
+                continue
+
+            if not isinstance(data, dict):
+                logger.error("JSON 解析结果不是 dict")
+                return QzoneParser._error_payload(QZONE_MSG_NON_OBJECT_RESPONSE)
+
+            if debug:
+                logger.debug(f"解析后数据: {data}")
+            return data
+
+        if parse_error is None:
             logger.warning("响应内容缺少 JSON 片段")
             return QzoneParser._error_payload(QZONE_MSG_INVALID_RESPONSE)
 
-        json_str = json_str.replace("undefined", "null").strip()
-        try:
-            data = json5.loads(json_str)
-        except (ValueError, json.JSONDecodeError) as e:
-            logger.error(f"JSON 解析错误: {e}")
-            return QzoneParser._error_payload(QZONE_MSG_JSON_PARSE_ERROR)
-
-        if not isinstance(data, dict):
-            logger.error("JSON 解析结果不是 dict")
-            return QzoneParser._error_payload(QZONE_MSG_NON_OBJECT_RESPONSE)
-
-        if debug:
-            logger.debug(f"解析后数据: {data}")
-        return data
+        logger.error(f"JSON 解析错误: {parse_error}")
+        return QzoneParser._error_payload(QZONE_MSG_JSON_PARSE_ERROR)
 
     @staticmethod
     def parse_upload_result(payload: dict[str, Any]) -> tuple[str, str]:
