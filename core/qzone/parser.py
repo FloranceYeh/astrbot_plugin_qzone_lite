@@ -1,6 +1,5 @@
 import datetime
 import json
-import re
 from typing import Any
 
 import bs4
@@ -24,6 +23,42 @@ class QzoneParser:
         return {"code": QZONE_CODE_UNKNOWN, "message": message, "data": {}}
 
     @staticmethod
+    def _extract_json_object(text: str) -> str | None:
+        start = text.find("{")
+        if start == -1:
+            return None
+
+        depth = 0
+        in_string = False
+        quote = ""
+        escaped = False
+        for idx in range(start, len(text)):
+            ch = text[idx]
+            if in_string:
+                if escaped:
+                    escaped = False
+                    continue
+                if ch == "\\":
+                    escaped = True
+                    continue
+                if ch == quote:
+                    in_string = False
+                continue
+
+            if ch in ("'", '"'):
+                in_string = True
+                quote = ch
+                continue
+            if ch == "{":
+                depth += 1
+                continue
+            if ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start : idx + 1]
+        return None
+
+    @staticmethod
     def parse_response(text: str, *, debug: bool = False) -> dict[str, Any]:
         if debug:
             logger.debug(f"响应数据: {text}")
@@ -31,19 +66,10 @@ class QzoneParser:
             logger.warning("响应内容为空")
             return QzoneParser._error_payload(QZONE_MSG_EMPTY_RESPONSE)
 
-        if m := re.search(
-            r"callback\s*\(\s*([^{]*(\{.*\})[^)]*)\s*\)",
-            text,
-            re.I | re.S,
-        ):
-            json_str = m.group(2)
-        else:
-            start = text.find("{")
-            end = text.rfind("}")
-            if start == -1 or end == -1 or end < start:
-                logger.warning("响应内容缺少 JSON 片段")
-                return QzoneParser._error_payload(QZONE_MSG_INVALID_RESPONSE)
-            json_str = text[start : end + 1]
+        json_str = QzoneParser._extract_json_object(text)
+        if json_str is None:
+            logger.warning("响应内容缺少 JSON 片段")
+            return QzoneParser._error_payload(QZONE_MSG_INVALID_RESPONSE)
 
         json_str = json_str.replace("undefined", "null").strip()
         try:

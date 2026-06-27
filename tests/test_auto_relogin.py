@@ -111,6 +111,8 @@ def _install_test_stubs() -> None:
 _install_test_stubs()
 
 from core.qzone.api import QzoneAPI
+from core.qzone.constants import QZONE_CODE_UNKNOWN, QZONE_MSG_JSON_PARSE_ERROR
+from core.qzone.parser import QzoneParser
 from core.qzone.model import QzoneContext
 
 
@@ -174,6 +176,14 @@ class FakeLoginSession:
 
 
 class AutoReloginTests(unittest.IsolatedAsyncioTestCase):
+    def test_parse_response_uses_first_balanced_json_object(self):
+        raw = 'QZFL.callback({"code":0,"data":{"text":"a } brace"}}); var extra = {"code":-1}'
+
+        parsed = QzoneParser.parse_response(raw)
+
+        self.assertEqual(parsed["code"], 0)
+        self.assertEqual(parsed["data"]["text"], "a } brace")
+
     async def test_get_feeds_rebuilds_params_after_relogin(self):
         old_ctx = QzoneContext(
             uin=10001,
@@ -256,6 +266,35 @@ class AutoReloginTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fake_session.login_calls, 1)
         self.assertEqual(fake_http.calls[0]["url"], f"{api.BASE_URL}/{old_ctx.uin}")
         self.assertEqual(fake_http.calls[1]["url"], f"{api.BASE_URL}/{new_ctx.uin}")
+
+    async def test_json_parse_error_with_token_marker_does_not_relogin(self):
+        ctx = QzoneContext(
+            uin=50005,
+            skey="skey",
+            p_skey="p_skey",
+            raw_cookies={"uin": "o50005"},
+        )
+        fake_http = FakeClientSession([(200, "{\n  g_tk: oops\n}")])
+        fake_session = FakeLoginSession([ctx])
+        config = SimpleNamespace(
+            timeout=10,
+            request_interval=0,
+            request_jitter=0,
+            auto_reset_on_login_expired=True,
+        )
+
+        with patch("core.qzone.client.aiohttp.ClientSession", return_value=fake_http):
+            api = QzoneAPI(fake_session, config)
+
+        try:
+            raw = await api.request("GET", "https://example.test/api")
+        finally:
+            await api.close()
+
+        self.assertEqual(raw["code"], QZONE_CODE_UNKNOWN)
+        self.assertEqual(raw["message"], QZONE_MSG_JSON_PARSE_ERROR)
+        self.assertEqual(fake_session.login_calls, 0)
+        self.assertEqual(fake_session.reset_calls, [])
 
 
 if __name__ == "__main__":

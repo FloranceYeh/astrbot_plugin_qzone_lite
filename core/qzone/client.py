@@ -30,18 +30,48 @@ RequestPayload = dict[str, Any] | Callable[[Any], dict[str, Any] | None] | None
 
 class QzoneHttpClient:
     MAX_RETRIES = 2
-    _LOGIN_TEXT_MARKERS = (
+    _LOGIN_MESSAGE_MARKERS = (
         "请先登录",
+        "请登录",
         "重新登录",
         "登录后",
         "登录空间",
+        "登录失效",
+        "登录态失效",
+        "未登录",
+        "会话过期",
         "QQ空间登录",
         "qzone login",
+        "please login",
+        "please log in",
+        "login required",
+        "not logged in",
+        "not login",
+        "need login",
         "login",
         "expired",
         "skey",
         "p_skey",
         "g_tk",
+    )
+    _LOGIN_BODY_MARKERS = (
+        "请先登录",
+        "请登录",
+        "重新登录",
+        "登录后",
+        "登录空间",
+        "登录失效",
+        "登录态失效",
+        "未登录",
+        "会话过期",
+        "QQ空间登录",
+        "qzone login",
+        "please login",
+        "please log in",
+        "login required",
+        "not logged in",
+        "not login",
+        "need login",
     )
     _LOGIN_PARSE_MESSAGES = {
         QZONE_MSG_INVALID_RESPONSE,
@@ -229,11 +259,19 @@ class QzoneHttpClient:
         return dict(payload)
 
     @classmethod
-    def _contains_login_marker(cls, text: str) -> bool:
+    def _contains_marker(cls, text: str, markers: tuple[str, ...]) -> bool:
         if not text:
             return False
         lowered = text.lower()
-        return any(marker in text or marker in lowered for marker in cls._LOGIN_TEXT_MARKERS)
+        return any(marker in text or marker in lowered for marker in markers)
+
+    @classmethod
+    def _contains_login_message_marker(cls, text: str) -> bool:
+        return cls._contains_marker(text, cls._LOGIN_MESSAGE_MARKERS)
+
+    @classmethod
+    def _contains_login_body_marker(cls, text: str) -> bool:
+        return cls._contains_marker(text, cls._LOGIN_BODY_MARKERS)
 
     @classmethod
     def _is_login_expired_response(
@@ -248,11 +286,14 @@ class QzoneHttpClient:
             return True
 
         message = str(parsed.get("message") or "")
-        if cls._contains_login_marker(message):
+        if (
+            message not in cls._LOGIN_PARSE_MESSAGES
+            and cls._contains_login_message_marker(message)
+        ):
             return True
 
         body = str(text or "")
-        if not cls._contains_login_marker(body):
+        if not cls._contains_login_body_marker(body):
             return False
 
         if status == HTTP_STATUS_FORBIDDEN:
@@ -260,9 +301,7 @@ class QzoneHttpClient:
 
         if parsed.get("code") == QZONE_CODE_UNKNOWN and message in cls._LOGIN_PARSE_MESSAGES:
             return True
-
-        lowered = body.lower()
-        return "<html" in lowered or "</html>" in lowered
+        return False
 
     async def _reset_and_relogin(self) -> None:
         logger.warning("登录失效，正在重置状态并重新登录")
