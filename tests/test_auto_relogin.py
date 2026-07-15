@@ -3,7 +3,7 @@ import types
 import unittest
 import json
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 
 def _install_test_stubs() -> None:
@@ -114,6 +114,7 @@ from core.qzone.api import QzoneAPI
 from core.qzone.constants import QZONE_CODE_UNKNOWN, QZONE_MSG_JSON_PARSE_ERROR
 from core.qzone.parser import QzoneParser
 from core.qzone.model import QzoneContext
+from core.model import Post
 
 
 class FakeResponse:
@@ -303,6 +304,38 @@ class AutoReloginTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(raw["message"], QZONE_MSG_JSON_PARSE_ERROR)
         self.assertEqual(fake_session.login_calls, 0)
         self.assertEqual(fake_session.reset_calls, [])
+
+    async def test_publish_rejects_images_when_none_can_be_read(self):
+        ctx = QzoneContext(
+            uin=60006,
+            skey="skey",
+            p_skey="p_skey",
+            raw_cookies={"uin": "o60006"},
+        )
+        fake_http = FakeClientSession([])
+        fake_session = FakeLoginSession([ctx])
+        config = SimpleNamespace(
+            timeout=10,
+            request_interval=0,
+            request_jitter=0,
+            auto_reset_on_login_expired=True,
+        )
+        post = Post(text="test", images=["/missing-image.png"])
+
+        with patch("core.qzone.client.aiohttp.ClientSession", return_value=fake_http):
+            api = QzoneAPI(fake_session, config)
+
+        try:
+            with patch(
+                "core.qzone.api.normalize_images",
+                new=AsyncMock(return_value=[]),
+            ):
+                with self.assertRaises(RuntimeError):
+                    await api.publish(post)
+        finally:
+            await api.close()
+
+        self.assertEqual(fake_http.calls, [])
 
 
 if __name__ == "__main__":

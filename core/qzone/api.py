@@ -71,6 +71,8 @@ class QzoneAPI(QzoneHttpClient):
             logger.debug(f"正在上传图片: {post.images}")
             pic_bos, richvals = [], []
             imgs: list[bytes] = await normalize_images(post.images)
+            if not imgs:
+                raise RuntimeError("未能读取任何待上传图片")
             for img in imgs:
                 resp = await self._upload_image(img)
                 if not resp.ok:

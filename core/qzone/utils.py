@@ -3,6 +3,7 @@ import asyncio
 import base64
 import binascii
 import ipaddress
+from pathlib import Path
 import socket
 from typing import Union
 from urllib.parse import urlparse
@@ -110,6 +111,19 @@ async def normalize_images(images: Sequence[BytesOrStr] | None) -> list[bytes]:
             image_bytes = _decode_base64_image(item)
             if image_bytes is not None and len(image_bytes) > 0:
                 cleaned.append(image_bytes)
+                continue
+            local_path = Path(item)
+            if local_path.is_absolute():
+                try:
+                    file = await asyncio.to_thread(local_path.read_bytes)
+                except (OSError, ValueError) as e:
+                    logger.error(
+                        f"Failed to read local image name={local_path.name}: "
+                        f"{type(e).__name__}"
+                    )
+                else:
+                    if file:
+                        cleaned.append(file)
                 continue
             file = await download_file(item)
             if file is not None:
