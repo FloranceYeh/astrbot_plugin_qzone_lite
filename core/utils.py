@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from astrbot.api import logger
 from astrbot.core.message.components import At, Image, Reply
 from astrbot.core.platform import AstrMessageEvent
 from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
@@ -72,6 +73,41 @@ def _extract_image_source(seg: Image) -> str | None:
     return None
 
 
+def _describe_image_value(value: object) -> str:
+    if value is None:
+        return "none"
+    if not isinstance(value, str):
+        return type(value).__name__
+    stripped = value.strip()
+    if not stripped:
+        return "empty_str"
+    if stripped.startswith(("http://", "https://")):
+        kind = "url"
+    elif stripped.startswith(("base64://", "data:image/")):
+        kind = "base64"
+    elif ":\\" in stripped or stripped.startswith(("/", "./", "../")):
+        kind = "path"
+    else:
+        kind = "opaque"
+    return f"str:{kind}:len={len(stripped)}"
+
+
+def _log_unresolved_image(seg: Image) -> None:
+    fields = {
+        key: _describe_image_value(getattr(seg, key, None))
+        for key in ("url", "file", "src", "data_url")
+    }
+    raw = getattr(seg, "raw", None)
+    raw_keys = sorted(str(key) for key in raw) if isinstance(raw, dict) else []
+    logger.debug(
+        "Unresolved image source: segment_type=%s fields=%s raw_type=%s raw_keys=%s",
+        f"{type(seg).__module__}.{type(seg).__qualname__}",
+        fields,
+        type(raw).__name__,
+        raw_keys,
+    )
+
+
 async def get_image_urls(event: AstrMessageEvent, reply: bool = True) -> list[str]:
     chain = event.get_messages()
     images: list[str] = []
@@ -83,11 +119,20 @@ async def get_image_urls(event: AstrMessageEvent, reply: bool = True) -> list[st
                     source = _extract_image_source(seg)
                     if source:
                         images.append(source)
+                    else:
+                        _log_unresolved_image(seg)
     for seg in chain:
         if isinstance(seg, Image):
             source = _extract_image_source(seg)
             if source:
                 images.append(source)
+            else:
+                _log_unresolved_image(seg)
+    if not images:
+        logger.debug(
+            "No usable image extracted: chain_types=%s",
+            [f"{type(seg).__module__}.{type(seg).__qualname__}" for seg in chain],
+        )
     return list(dict.fromkeys(images))
 
 
