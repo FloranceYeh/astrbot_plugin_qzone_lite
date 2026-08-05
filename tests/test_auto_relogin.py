@@ -276,6 +276,52 @@ class AutoReloginTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fake_http.calls[0]["url"], f"{api.BASE_URL}/{old_ctx.uin}")
         self.assertEqual(fake_http.calls[1]["url"], f"{api.BASE_URL}/{new_ctx.uin}")
 
+    async def test_upload_image_rebuilds_payload_after_relogin(self):
+        old_ctx = QzoneContext(
+            uin=30003,
+            skey="old_skey",
+            p_skey="old_p_skey",
+            raw_cookies={"uin": "o30003"},
+        )
+        new_ctx = QzoneContext(
+            uin=40004,
+            skey="new_skey",
+            p_skey="new_p_skey",
+            raw_cookies={"uin": "o40004"},
+        )
+        fake_http = FakeClientSession(
+            [
+                (200, '{"ret":-1,"msg":"请先登录","data":{}}'),
+                (200, '{"ret":0,"msg":"","data":{}}'),
+            ]
+        )
+        fake_session = FakeLoginSession([old_ctx, new_ctx])
+        config = SimpleNamespace(
+            timeout=10,
+            request_interval=0,
+            request_jitter=0,
+            auto_reset_on_login_expired=True,
+        )
+
+        with patch("core.qzone.client.aiohttp.ClientSession", return_value=fake_http):
+            api = QzoneAPI(fake_session, config)
+
+        try:
+            resp = await api._upload_image(b"image")
+        finally:
+            await api.close()
+
+        self.assertTrue(resp.ok)
+        self.assertEqual(fake_session.login_calls, 1)
+        self.assertEqual(fake_session.reset_calls, [True])
+        self.assertEqual(len(fake_http.calls), 2)
+        self.assertEqual(fake_http.calls[0]["data"]["uin"], old_ctx.uin)
+        self.assertEqual(fake_http.calls[0]["data"]["skey"], old_ctx.skey)
+        self.assertEqual(fake_http.calls[0]["data"]["p_skey"], old_ctx.p_skey)
+        self.assertEqual(fake_http.calls[1]["data"]["uin"], new_ctx.uin)
+        self.assertEqual(fake_http.calls[1]["data"]["skey"], new_ctx.skey)
+        self.assertEqual(fake_http.calls[1]["data"]["p_skey"], new_ctx.p_skey)
+
     async def test_json_parse_error_with_token_marker_does_not_relogin(self):
         ctx = QzoneContext(
             uin=50005,

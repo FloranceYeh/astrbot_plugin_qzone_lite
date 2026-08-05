@@ -273,6 +273,31 @@ class QzoneHttpClient:
     def _contains_login_body_marker(cls, text: str) -> bool:
         return cls._contains_marker(text, cls._LOGIN_BODY_MARKERS)
 
+    @staticmethod
+    def _response_code(parsed: dict[str, Any]) -> Any:
+        for key in ("code", "ret"):
+            value = parsed.get(key)
+            if value is None:
+                continue
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return value
+        return QZONE_CODE_UNKNOWN
+
+    @staticmethod
+    def _response_message(parsed: dict[str, Any]) -> str:
+        payloads = [parsed]
+        data = parsed.get("data")
+        if isinstance(data, dict):
+            payloads.append(data)
+        for payload in payloads:
+            for key in ("message", "msg"):
+                value = payload.get(key)
+                if value:
+                    return str(value)
+        return ""
+
     @classmethod
     def _is_login_expired_response(
         cls,
@@ -282,10 +307,11 @@ class QzoneHttpClient:
     ) -> bool:
         if status == HTTP_STATUS_UNAUTHORIZED:
             return True
-        if parsed.get("code") == QZONE_CODE_LOGIN_EXPIRED:
+        code = cls._response_code(parsed)
+        if code == QZONE_CODE_LOGIN_EXPIRED:
             return True
 
-        message = str(parsed.get("message") or "")
+        message = cls._response_message(parsed)
         if (
             message not in cls._LOGIN_PARSE_MESSAGES
             and cls._contains_login_message_marker(message)
@@ -299,7 +325,7 @@ class QzoneHttpClient:
         if status == HTTP_STATUS_FORBIDDEN:
             return True
 
-        if parsed.get("code") == QZONE_CODE_UNKNOWN and message in cls._LOGIN_PARSE_MESSAGES:
+        if code == QZONE_CODE_UNKNOWN and message in cls._LOGIN_PARSE_MESSAGES:
             return True
         return False
 
